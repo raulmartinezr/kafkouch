@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>com.dasnano.dasgate.idp</groupId>
+	<artifactId>idp_extensions</artifactId>
+	<version>0.1.2-SNAPSHOT</version>
+	<packaging>jar</packaging>
+
+	<name>${project.artifactId}</name>
+	<description>Kafka connectors for couchdb</description>
+
+	<ciManagement>
+    	<system>Github Actions</system>
+   		 <url>https://github.com/raulmartinezr/kafkouch/actions/</url>
+  	</ciManagement>
+
+	<scm>
+    	<url>https://github.com/raulmartinezr/kafkouch.git</url>
+    	<connection>scm:git:https://github.com/raulmartinezr/kafkouch.git</connection>
+    	<tag>HEAD</tag>
+  	</scm>
+
+	<distributionManagement>
+     <repository>
+       <id>github</id>
+       <name>GitHub rmartinezr Apache Maven Packages</name>
+       <url>https://maven.pkg.github.com/raulmartinezr/kafkouch</url>
+     </repository>
+  </distributionManagement>
+
+
+	<properties>
+		<java.version>11</java.version>
+		<maven.compiler.source>${java.version}</maven.compiler.source>
+		<maven.compiler.target>${java.version}</maven.compiler.target>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<maven-shade.version>3.2.4</maven-shade.version>
+		<flatten-maven-plugin.version>1.2.2</flatten-maven-plugin.version>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+		<maven-jar-plugin.version>3.2.0</maven-jar-plugin.version>
+		<maven-release-plugin.version>3.0.0-M4</maven-release-plugin.version>
+	</properties>
+
+
+	<dependencies>
+
+
+
+
+
+
+
+
+		<!-- Tests -->
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-engine</artifactId>
+			<version>5.7.2</version>
+			<scope>test</scope>
+		</dependency>
+
+
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-inline</artifactId>
+			<version>3.11.1</version>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-junit-jupiter</artifactId>
+			<version>3.11.1</version>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.codehaus.mojo</groupId>
+			<artifactId>build-helper-maven-plugin</artifactId>
+			<version>3.3.0</version>
+			<type>maven-plugin</type>
+		</dependency>
+	</dependencies>
+
+
+
+
+	<build>
+		<finalName>${project.groupId}-${project.artifactId}-${project.version}</finalName>
+		<plugins>
+
+			<!-- <plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-shade-plugin</artifactId>
+				<version>${maven-shade.version}</version>
+				<executions>
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>shade</goal>
+						</goals>
+						<configuration>
+							<artifactSet>
+								<excludes>
+									<exclude>com.fasterxml.jackson.core</exclude>
+									<exclude>org.apache.httpcomponents</exclude>
+									<exclude>commons-logging</exclude>
+									<exclude>commons-codec</exclude>
+									<exclude>org.eclipse.persistence:*</exclude>
+								</excludes>
+							</artifactSet>
+							<filters>
+								<filter>
+									<artifact>*</artifact>
+									<excludes>
+										<exclude>META-INF/*.MF</exclude>
+										<exclude>META-INF/*.DSA</exclude>
+										<exclude>META-INF/*.SF</exclude>
+									</excludes>
+								</filter>
+							</filters>
+							<transformers>
+								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+									<manifestEntries>
+										<Main-Class>${project.build.mainClass}</Main-Class>
+										<Specification-Title>${project.artifactId}</Specification-Title>
+										<Specification-Version>${project.version}</Specification-Version>
+										<Implementation-Title>${project.artifactId}</Implementation-Title>
+										<Implementation-Version>${project.version}</Implementation-Version>
+										<Implementation-Vendor-Id>${project.groupId}</Implementation-Vendor-Id>
+										<X-Compile-Source-JDK>${maven.compile.source}</X-Compile-Source-JDK>
+										<X-Compile-Target-JDK>${maven.compile.target}</X-Compile-Target-JDK>
+									</manifestEntries>
+								</transformer>
+							</transformers>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin> -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<version>${maven-jar-plugin.version}</version>
+				<configuration>
+					<outputDirectory>./dist</outputDirectory>
+					<archive>
+						<manifest>
+							<addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+							<addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+						</manifest>
+					</archive>
+					<finalName>${project.artifactId}-${project.version}</finalName>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<executions>
+					<execution>
+					<id>copy-dependencies</id>
+					<phase>prepare-package</phase>
+					<goals>
+						<goal>copy-dependencies</goal>
+					</goals>
+					<configuration>
+							<outputDirectory>${project.build.directory}/libs</outputDirectory>
+					</configuration>
+					</execution>
+				</executions>
+				</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-release-plugin</artifactId>
+				<version>${maven-release-plugin.version}</version>
+				<configuration>
+					<tagNameFormat>v@{project.version}</tagNameFormat>
+					<autoVersionSubmodules>true</autoVersionSubmodules>
+					<!-- <releaseProfiles>nexus_releases</releaseProfiles>
+					<arguments>-Pnexus_releases</arguments> -->
+				</configuration>
+			</plugin>
+			<!-- <plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>flatten-maven-plugin</artifactId>
+				<version>${flatten-maven-plugin.version}</version>
+				<configuration>
+					<updatePomFile>true</updatePomFile>
+				</configuration>
+				<executions>
+					<execution>
+						<id>flatten</id>
+						<phase>process-resources</phase>
+						<goals>
+							<goal>flatten</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>flatten.clean</id>
+						<phase>clean</phase>
+						<goals>
+							<goal>clean</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin> -->
+
+			<plugin>
+				<groupId>net.revelc.code.formatter</groupId>
+				<artifactId>formatter-maven-plugin</artifactId>
+				<version>2.15.0</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>format</goal>
+							<goal>validate</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<configFile>${project.basedir}/formatter.xml</configFile>
+					<!-- <excludes>
+						<exclude>gitlab-ci yaml</exclude>
+					  </excludes> -->
+				</configuration>
+
+			</plugin>
+
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.8.7</version>
+				<executions>
+					<execution>
+						<id>jacoco-initialize</id>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>jacoco-site</id>
+						<phase>package</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>3.0.0-M5</version>
+
+				<dependencies>
+					<dependency>
+						<groupId>org.junit.jupiter</groupId>
+						<artifactId>junit-jupiter-engine</artifactId>
+						<version>5.7.2</version>
+
+					</dependency>
+				</dependencies>
+
+
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>versions-maven-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>major</id>
+						<goals>
+							<goal>set</goal>
+						</goals>
+						<configuration>
+							<generateBackupPoms>false</generateBackupPoms>
+							<newVersion>${parsedVersion.nextMajorVersion}.0.0-SNAPSHOT</newVersion>
+						</configuration>
+					</execution>
+					<execution>
+						<id>minor</id>
+						<goals>
+							<goal>set</goal>
+						</goals>
+						<configuration>
+							<generateBackupPoms>false</generateBackupPoms>
+							<newVersion>
+								${parsedVersion.majorVersion}.${parsedVersion.nextMinorVersion}.0-SNAPSHOT</newVersion>
+						</configuration>
+					</execution>
+					<execution>
+						<id>patch</id>
+						<goals>
+							<goal>set</goal>
+						</goals>
+						<configuration>
+							<generateBackupPoms>false</generateBackupPoms>
+							<newVersion>
+								${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.nextIncrementalVersion}-SNAPSHOT</newVersion>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>build-helper-maven-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>default-cli</id>
+						<goals>
+							<goal>parse-version</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+
+	</build>
+
+
+</project>
