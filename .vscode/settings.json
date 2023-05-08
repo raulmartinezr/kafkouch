@@ -1,0 +1,19 @@
+{
+
+        "java.configuration.updateBuildConfiguration": "automatic",
+        "java.codeGeneration.generateComments": true,
+        "java.implementationsCodeLens.enabled": true,
+        "java.completion.guessMethodArguments": true,
+        "java.codeGeneration.useBlocks": true,
+        "java.configuration.runtimes": [],
+        "maven.terminal.useJavaHome": true,
+        "java.checkstyle.configuration": "checkstyle.xml",
+        "java.checkstyle.autocheck": true,
+        "java.checkstyle.modules": [],
+        "java.format.settings.url": "${workspaceFolder}/formatter.xml",
+        "java.format.settings.profile": "GoogleStyle",
+        "java.compile.nullAnalysis.mode": "automatic",
+        "yaml.customTags": ["!reference sequence"]
+
+
+}

@@ -2,13 +2,12 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>com.dasnano.dasgate.idp</groupId>
-	<artifactId>idp_extensions</artifactId>
-	<version>0.1.2-SNAPSHOT</version>
+	<groupId>com.raulmartinezr</groupId>
+	<artifactId>kafkouch</artifactId>
+	<version>0.0.1</version>
 	<packaging>jar</packaging>
-
-	<name>${project.artifactId}</name>
-	<description>Kafka connectors for couchdb</description>
+	<name>Kafka Connector for CouchDB</name>
+	<description>A Kafka Connect Couchdb connector for copying data between Kafka and Couchdb Server.</description>
 
 	<ciManagement>
     	<system>Github Actions</system>
@@ -41,11 +40,31 @@
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<maven-jar-plugin.version>3.2.0</maven-jar-plugin.version>
 		<maven-release-plugin.version>3.0.0-M4</maven-release-plugin.version>
+
+		<kafka.version>3.4.0</kafka.version>
+		<netty.version>4.1.92.Final</netty.version>
 	</properties>
 
 
 	<dependencies>
-
+		<dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>connect-api</artifactId>
+            <version>${kafka.version}</version>
+            <scope>provided</scope>
+        </dependency>
+		<dependency>
+			<groupId>org.apache.kafka</groupId>
+			<artifactId>connect-json</artifactId>
+			<version>${kafka.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.netty</groupId>
+			<artifactId>netty-all</artifactId>
+			<version>${netty.version}</version>
+		</dependency>
+<!-- Thanks for using https://jar-download.com -->
 
 
 
