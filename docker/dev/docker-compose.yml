@@ -72,6 +72,7 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CLIENT:PLAINTEXT,INTER_BROKER:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: CLIENT://localhost:9092,INTER_BROKER://broker1:9093
       KAFKA_INTER_BROKER_LISTENER_NAME: INTER_BROKER
+      KAFKA_MIN_INSYNC_REPLICAS: 1
 
   broker2:
     image: confluentinc/cp-kafka:7.4.0
@@ -95,6 +96,7 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CLIENT:PLAINTEXT,INTER_BROKER:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: CLIENT://localhost:9094,INTER_BROKER://broker2:9095
       KAFKA_INTER_BROKER_LISTENER_NAME: INTER_BROKER
+      KAFKA_MIN_INSYNC_REPLICAS: 1
 
   broker3:
     image: confluentinc/cp-kafka:7.4.0
@@ -118,6 +120,7 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CLIENT:PLAINTEXT,INTER_BROKER:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: CLIENT://localhost:9096,INTER_BROKER://broker3:9097
       KAFKA_INTER_BROKER_LISTENER_NAME: INTER_BROKER
+      KAFKA_MIN_INSYNC_REPLICAS: 1
 
   kafka-ui:
     image: provectuslabs/kafka-ui
@@ -176,10 +179,10 @@ services:
       CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: "1"
       CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: "1"
       CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: "1"
-      CONNECT_PLUGIN_PATH: '/usr/share/java,/usr/share/dist'
+      CONNECT_PLUGIN_PATH: '/usr/share/java,/usr/share/plugins'
     volumes:
       - ./connect/postgres-source.json:/connect/postgres-source.json
-      - ${PWD}/dist:/usr/share/dist
+      - ${PWD}/plugins:/usr/share/plugins
   control-center:
     image: confluentinc/cp-enterprise-control-center:7.4.0
     depends_on:
@@ -199,6 +202,28 @@ services:
       CONTROL_CENTER_CONNECT_CLUSTER: 'connect:8083'
       CONTROL_CENTER_REPLICATION_FACTOR: 1
       CONTROL_CENTER_KSQL_ENABLE: "false"
+
+  kadeck:
+    image: xeotek/kadeck:4.2.9
+    hostname: kadeck
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+      - broker1
+      - broker2
+      - broker3
+      - connect
+    ports:
+      - "6023:80"
+      - "6092:9092"
+      - "6083:8083"
+      - "6081:8081"
+    environment:
+      xeotek_kadeck_free: "rmartinez@veridas.com"
+      FULLENV: "true"
+      ADV_HOST: kadeck:6092
+      xeotek_kadeck_port: 80
 
   schemaregistry:
     image: confluentinc/cp-schema-registry:7.4.0

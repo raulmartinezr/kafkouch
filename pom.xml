@@ -95,12 +95,12 @@
 			<scope>test</scope>
 		</dependency>
 
-		<dependency>
+		<!-- <dependency>
 			<groupId>org.codehaus.mojo</groupId>
 			<artifactId>build-helper-maven-plugin</artifactId>
 			<version>3.3.0</version>
 			<type>maven-plugin</type>
-		</dependency>
+		</dependency> -->
 	</dependencies>
 
 
@@ -110,7 +110,7 @@
 		<finalName>${project.groupId}-${project.artifactId}-${project.version}</finalName>
 		<plugins>
 
-			 <plugin>
+			<!-- <plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-shade-plugin</artifactId>
 				<version>${maven-shade.version}</version>
@@ -123,11 +123,11 @@
 						<configuration>
 							<artifactSet>
 								<excludes>
-									<!-- <exclude>com.fasterxml.jackson.core</exclude>
+									<exclude>com.fasterxml.jackson.core</exclude>
 									<exclude>org.apache.httpcomponents</exclude>
 									<exclude>commons-logging</exclude>
 									<exclude>commons-codec</exclude>
-									<exclude>org.eclipse.persistence:*</exclude> -->
+									<exclude>org.eclipse.persistence:*</exclude>
 								</excludes>
 							</artifactSet>
 							<filters>
@@ -158,12 +158,13 @@
 					</execution>
 				</executions>
 			</plugin>
+			-->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-jar-plugin</artifactId>
 				<version>${maven-jar-plugin.version}</version>
 				<configuration>
-					<outputDirectory>./dist</outputDirectory>
+					<outputDirectory>${project.basedir}/plugins/${project.artifactId}</outputDirectory>
 					<archive>
 						<manifest>
 							<addDefaultImplementationEntries>true</addDefaultImplementationEntries>
@@ -184,7 +185,9 @@
 						<goal>copy-dependencies</goal>
 					</goals>
 					<configuration>
-							<outputDirectory>${project.build.directory}/libs</outputDirectory>
+							<outputDirectory>${project.basedir}/plugins/${project.artifactId}</outputDirectory>
+							<includeScope>runtime</includeScope>
+							<!-- <excludeScope>provided</excludeScope> -->
 					</configuration>
 					</execution>
 				</executions>
