@@ -26,3 +26,4 @@ replay_pid*
 
 docker/dev/data
 target
+dependency-reduced-pom.xml
