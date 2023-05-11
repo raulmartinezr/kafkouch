@@ -50,15 +50,11 @@ lint: ## lint-> format and validate
 test: ## tests
 	mvn --no-transfer-progress clean jacoco:prepare-agent test jacoco:report
 
-docker-dev-up:
+docker-dev-up: ## start the environment
 	mkdir -p docker/dev/deployments
 	docker-compose -f docker/dev/docker-compose.yml up -d
 
-docker-dev-down:
+docker-dev-down: ## stop the environment
 	docker-compose -f docker/dev/docker-compose.yml down
-
-run: docker-dev-up package
-	rm -f docker/dev/deployments/*
-	cp dist/idp_extensions-$(CURRENT_VERSION).jar docker/dev/deployments
 
 stop: docker-dev-down

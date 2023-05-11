@@ -1,9 +1,15 @@
 package com.raulmartinezr.kafkouch.connectors;
 
+import java.io.IOException;
+import java.net.URL;
+import java.security.CodeSource;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.jar.Attributes;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
 
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.Task;
@@ -20,10 +26,13 @@ public class CouchdbSourceConnector extends SourceConnector {
   CouchdbChangesFeedReader couchdbChangesFeedReader = null;
   ReconfigurationThread reconfigurationThread = null;
 
+  private static final ConfigDef CONFIG_DEF = new ConfigDef()
+    .define(FILE_CONFIG, Type.STRING, Importance.HIGH, "Source filename.")
+    .define(TOPIC_CONFIG, Type.STRING, Importance.HIGH, "The topic to publish data to");
+
   @Override
   public String version() {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'version'");
+    return this.readVersionFromManifest();
   }
 
   @Override
@@ -79,6 +88,23 @@ public class CouchdbSourceConnector extends SourceConnector {
     throw new UnsupportedOperationException("Unimplemented method 'taskConfigs'");
   }
 
+  private String readVersionFromManifest() {
+    CodeSource codeSource = CouchdbSourceConnector.class.getProtectionDomain().getCodeSource();
+    if (codeSource != null) {
+      URL jarUrl = codeSource.getLocation();
+      try (JarFile jarFile = new JarFile(jarUrl.getPath())) {
+        Manifest manifest = jarFile.getManifest();
+        if (manifest != null) {
+          Attributes attributes = manifest.getMainAttributes();
+          return attributes.getValue("Implementation-Version");
+        }
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }
+    return null;
+  }
+
 }
 
 
@@ -111,4 +137,5 @@ class ReconfigurationThread extends Thread {
     }
 
   }
+
 }

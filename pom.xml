@@ -30,7 +30,7 @@
 
 
 	<properties>
-		<java.version>20</java.version>
+		<java.version>11</java.version>
 		<maven.compiler.source>${java.version}</maven.compiler.source>
 		<maven.compiler.target>${java.version}</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -43,6 +43,8 @@
 
 		<kafka.version>3.4.0</kafka.version>
 		<okhttp.version>4.10.0</okhttp.version>
+		<runtime.javadoc.version>0.13.0</runtime.javadoc.version>
+		<jsoup.version>1.16.1</jsoup.version>
 	</properties>
 
 
@@ -64,6 +66,16 @@
     	<artifactId>okhttp</artifactId>
 			<version>${okhttp.version}</version>
 		</dependency>
+		 <dependency>
+            <groupId>com.github.therapi</groupId>
+            <artifactId>therapi-runtime-javadoc</artifactId>
+            <version>${runtime.javadoc.version}</version>
+        </dependency>
+		<dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>${jsoup.version}</version>
+        </dependency>
 <!-- Thanks for using https://jar-download.com -->
 
 
