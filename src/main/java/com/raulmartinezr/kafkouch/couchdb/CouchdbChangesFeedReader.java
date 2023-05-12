@@ -56,9 +56,8 @@ public class CouchdbChangesFeedReader {
   }
 
   public void startReadingChangesFeed() {
-    String globalChangesFeedUrl =
-        this.client.getUrl() + " /_db_updates?feed=" + this.feed.toString() + "&heartbeat="
-            + this.heartbeat + "&timeout=" + this.timeout + "&since=" + this.since;
+    String globalChangesFeedUrl = this.client.getUrl() + "/_db_updates?feed=" + this.feed.toString()
+        + "&heartbeat=" + this.heartbeat + "&timeout=" + this.timeout + "&since=" + this.since;
     Request request = new Request.Builder().url(globalChangesFeedUrl).build();
 
     this.buffer = new OrderedBuffer<ContinuousFeedEntry>(this.maxBufferSize,
@@ -119,7 +118,7 @@ public class CouchdbChangesFeedReader {
     private int timeout = 60000;
     private FeedType feed = FeedType.CONTINUOUS;
     private String since = "now";
-    private boolean connect = false;
+    private boolean connect = true;
     private String url;
     private String username;
     private String password;

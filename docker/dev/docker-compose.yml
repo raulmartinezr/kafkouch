@@ -160,6 +160,7 @@ services:
       - broker3
     ports:
       - '8083:8083'
+      - '5005:5005'
     environment:
       CONNECT_BOOTSTRAP_SERVERS: 'broker1:9093'
       CONNECT_REST_PORT: 8083
@@ -180,6 +181,7 @@ services:
       CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: "1"
       CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: "1"
       CONNECT_PLUGIN_PATH: '/usr/share/java,/usr/share/plugins'
+      JAVA_TOOL_OPTIONS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
     volumes:
       - ./connect/postgres-source.json:/connect/postgres-source.json
       - ${PWD}/plugins:/usr/share/plugins

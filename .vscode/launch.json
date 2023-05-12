@@ -1,0 +1,12 @@
+{
+
+    "configurations": [
+    {
+        "type": "java",
+        "name": "Attach",
+        "request": "attach",
+        "hostName": "localhost",
+        "port": 5005
+    }
+    ]
+  }

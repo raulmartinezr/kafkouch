@@ -7,8 +7,7 @@ import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigException;
 
 public class ConfigHelper {
-  private static final KafkaConfigProxyFactory factory =
-      new KafkaConfigProxyFactory("couchbase");
+  private static final KafkaConfigProxyFactory factory = new KafkaConfigProxyFactory("couchdb");
 
   private ConfigHelper() {
     throw new AssertionError("not instantiable");

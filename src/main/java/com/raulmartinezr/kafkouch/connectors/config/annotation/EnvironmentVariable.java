@@ -6,8 +6,8 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Indicates the config key's value should be obtained from
- * the named environment variable (if the variable is set).
+ * Indicates the config key's value should be obtained from the named environment variable (if the
+ * variable is set).
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)

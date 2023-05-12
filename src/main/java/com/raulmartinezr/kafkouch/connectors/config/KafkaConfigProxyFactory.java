@@ -43,12 +43,11 @@ import static java.util.Objects.requireNonNull;
 /**
  * Given a config interface, generates a matching Kafka ConfigDef.
  * <p>
- * Given a config interface and a set of config properties, returns an
- * implementation of the interface that can be used to access the
- * config properties in a type-safe way.
+ * Given a config interface and a set of config properties, returns an implementation of the
+ * interface that can be used to access the config properties in a type-safe way.
  * <p>
- * A "config interface" is any interface containing only zero-arg methods
- * whose return type is one of:
+ * A "config interface" is any interface containing only zero-arg methods whose return type is one
+ * of:
  * <ul>
  * <li>String
  * <li>boolean
@@ -63,16 +62,12 @@ import static java.util.Objects.requireNonNull;
  * <li>{@link DataSize}
  * <li>any enum
  * </ul>
- * Support for additional types can be added by calling
- * {@link #register(Class, CustomTypeHandler)}.
+ * Support for additional types can be added by calling {@link #register(Class, CustomTypeHandler)}.
  * <p>
- * Each interface method corresponds to a Kafka config key. The return type of
- * the method
- * determines the type of the config key. Other config key attributes are
- * inferred
- * from the method, or can be made explicit by annotating the method
- * with one of the annotations in
- * {@link com.couchbase.connect.kafka.util.config.annotation}.
+ * Each interface method corresponds to a Kafka config key. The return type of the method determines
+ * the type of the config key. Other config key attributes are inferred from the method, or can be
+ * made explicit by annotating the method with one of the annotations in
+ * {@link com.raulmartinezr.kafkouch.connectors.config.annotation}.
  */
 public class KafkaConfigProxyFactory {
   private static final Logger log = LoggerFactory.getLogger(KafkaConfigProxyFactory.class);
@@ -101,9 +96,7 @@ public class KafkaConfigProxyFactory {
    */
   public KafkaConfigProxyFactory(String prefix) {
     // make sure prefix is either empty, or ends with dot.
-    this.prefix = prefix.isEmpty()
-        ? ""
-        : (prefix.endsWith(".") ? prefix : prefix + ".");
+    this.prefix = prefix.isEmpty() ? "" : (prefix.endsWith(".") ? prefix : prefix + ".");
 
     initTypeMap();
 
@@ -139,16 +132,14 @@ public class KafkaConfigProxyFactory {
   }
 
   /**
-   * Returns a Kafka ConfigDef whose config keys match the methods of the
-   * given interface.
+   * Returns a Kafka ConfigDef whose config keys match the methods of the given interface.
    */
   public <T> ConfigDef define(Class<T> configInterface) {
     return define(configInterface, new ConfigDef());
   }
 
   /**
-   * Returns the given Kafka ConfigDef augmented with config keys from
-   * the given interface.
+   * Returns the given Kafka ConfigDef augmented with config keys from the given interface.
    */
   public <T> ConfigDef define(Class<T> configInterface, ConfigDef def) {
     for (Method method : configInterface.getMethods()) {
@@ -158,28 +149,17 @@ public class KafkaConfigProxyFactory {
 
       validateReturnType(method);
 
-      def.define(new ConfigDef.ConfigKey(
-          getConfigKeyName(method),
-          getKafkaType(method),
-          getDefaultValue(method),
-          getValidator(method),
-          getImportance(method),
-          getDocumentation(method),
-          getGroup(method),
-          getOrderInGroup(method),
-          getWidth(method),
-          getDisplayName(method),
-          getDependents(method),
-          getRecommender(method),
-          false));
+      def.define(new ConfigDef.ConfigKey(getConfigKeyName(method), getKafkaType(method),
+          getDefaultValue(method), getValidator(method), getImportance(method),
+          getDocumentation(method), getGroup(method), getOrderInGroup(method), getWidth(method),
+          getDisplayName(method), getDependents(method), getRecommender(method), false));
     }
 
     return def;
   }
 
   /**
-   * Returns in implementation of the given config interface
-   * backed by the given properties.
+   * Returns in implementation of the given config interface backed by the given properties.
    * <p>
    * Logs the config.
    */
@@ -188,8 +168,7 @@ public class KafkaConfigProxyFactory {
   }
 
   /**
-   * Returns in implementation of the given config interface
-   * backed by the given properties.
+   * Returns in implementation of the given config interface backed by the given properties.
    *
    * @param doLog whether to log the config.
    */
@@ -197,24 +176,20 @@ public class KafkaConfigProxyFactory {
     ConfigDef configDef = define(configInterface, new ConfigDef());
     ConcreteKafkaConfig kafkaConfig = new ConcreteKafkaConfig(configDef, properties, doLog);
 
-    return configInterface.cast(
-        Proxy.newProxyInstance(
-            configInterface.getClassLoader(),
-            new Class[] { configInterface },
-            new AbstractInvocationHandler(configInterface.getName()) {
-              @Override
-              protected Object doInvoke(Object proxy, Method method, Object[] args) {
-                String configKeyName = getConfigKeyName(method);
-                Object result = getValueFromEnvironmentVariable(configKeyName, method)
-                    .orElse(kafkaConfig.get(configKeyName));
-                return postProcessValue(method, result);
-              }
-            }));
+    return configInterface.cast(Proxy.newProxyInstance(configInterface.getClassLoader(),
+        new Class[] {configInterface}, new AbstractInvocationHandler(configInterface.getName()) {
+          @Override
+          protected Object doInvoke(Object proxy, Method method, Object[] args) {
+            String configKeyName = getConfigKeyName(method);
+            Object result = getValueFromEnvironmentVariable(configKeyName, method)
+                .orElse(kafkaConfig.get(configKeyName));
+            return postProcessValue(method, result);
+          }
+        }));
   }
 
   /**
-   * Returns the name of the config key associated with the method invoked
-   * by the given consumer.
+   * Returns the name of the config key associated with the method invoked by the given consumer.
    * <p>
    * Example usage:
    *
@@ -223,14 +198,15 @@ public class KafkaConfigProxyFactory {
    * </pre>
    *
    * @param configInterface the config interface to inspect
-   * @param methodInvoker   accepts an implementation of the specified interface
-   *                        and calls the method whose name you want to know
+   * @param methodInvoker accepts an implementation of the specified interface and calls the method
+   *        whose name you want to know
    */
   public <T> String keyName(Class<T> configInterface, Consumer<T> methodInvoker) {
     try {
       T instance = newProxyForKeyNames(configInterface);
       methodInvoker.accept(instance);
-      throw new IllegalArgumentException("Consumer should have invoked a method of the config interface.");
+      throw new IllegalArgumentException(
+          "Consumer should have invoked a method of the config interface.");
 
     } catch (KeyNameHolderException e) {
       return e.name;
@@ -238,20 +214,17 @@ public class KafkaConfigProxyFactory {
   }
 
   /**
-   * Returns an implementation whose methods all throw an exception
-   * that holds the name of the config key associated with the method.
+   * Returns an implementation whose methods all throw an exception that holds the name of the
+   * config key associated with the method.
    */
   protected <T> T newProxyForKeyNames(Class<T> configInterface) {
-    return configInterface.cast(
-        Proxy.newProxyInstance(
-            configInterface.getClassLoader(),
-            new Class[] { configInterface },
-            new AbstractInvocationHandler(configInterface.getName()) {
-              @Override
-              protected Object doInvoke(Object proxy, Method method, Object[] args) {
-                throw new KeyNameHolderException(getConfigKeyName(method));
-              }
-            }));
+    return configInterface.cast(Proxy.newProxyInstance(configInterface.getClassLoader(),
+        new Class[] {configInterface}, new AbstractInvocationHandler(configInterface.getName()) {
+          @Override
+          protected Object doInvoke(Object proxy, Method method, Object[] args) {
+            throw new KeyNameHolderException(getConfigKeyName(method));
+          }
+        }));
   }
 
   protected static class KeyNameHolderException extends RuntimeException {
@@ -317,20 +290,18 @@ public class KafkaConfigProxyFactory {
     // fail fast if return type is unsupported List type
     if (method.getReturnType().equals(List.class)
         && !hasParameters(method.getGenericReturnType(), String.class)) {
-      throw new RuntimeException(
-          "Method " + method + " has unsupported return type; For lists, only List<String> is supported.");
+      throw new RuntimeException("Method " + method
+          + " has unsupported return type; For lists, only List<String> is supported.");
     }
   }
 
   protected List<String> getDependents(Method method) {
-    return getAnnotation(method, Dependents.class)
-        .map(a -> Arrays.asList(a.value()))
+    return getAnnotation(method, Dependents.class).map(a -> Arrays.asList(a.value()))
         .orElse(emptyList());
   }
 
   protected String getDisplayName(Method method) {
-    return getAnnotation(method, DisplayName.class)
-        .map(DisplayName::value)
+    return getAnnotation(method, DisplayName.class).map(DisplayName::value)
         .orElseGet(() -> getDefaultDisplayName(method));
   }
 
@@ -369,8 +340,7 @@ public class KafkaConfigProxyFactory {
   }
 
   protected Optional<String> getEnvironmentVariableName(Method method) {
-    return getAnnotation(method, EnvironmentVariable.class)
-        .map(EnvironmentVariable::value);
+    return getAnnotation(method, EnvironmentVariable.class).map(EnvironmentVariable::value);
   }
 
   protected int getOrderInGroup(Method method) {
@@ -392,11 +362,11 @@ public class KafkaConfigProxyFactory {
 
   private static Object invokeCompanion(Method method, String suffix) {
     try {
-      Method companion = method.getDeclaringClass()
-          .getDeclaredMethod(method.getName() + suffix);
+      Method companion = method.getDeclaringClass().getDeclaredMethod(method.getName() + suffix);
 
       if (!Modifier.isStatic(companion.getModifiers())) {
-        throw new RuntimeException("Companion method " + method.getName() + suffix + "() must be static.");
+        throw new RuntimeException(
+            "Companion method " + method.getName() + suffix + "() must be static.");
       }
       return companion.invoke(null);
 
@@ -404,12 +374,14 @@ public class KafkaConfigProxyFactory {
       return null;
 
     } catch (IllegalAccessException | InvocationTargetException e) {
-      throw new RuntimeException("Failed to invoke " + suffix + " companion method for " + method, e);
+      throw new RuntimeException("Failed to invoke " + suffix + " companion method for " + method,
+          e);
     }
   }
 
   protected ConfigDef.Recommender getRecommender(Method method) {
-    ConfigDef.Recommender userProvided = (ConfigDef.Recommender) invokeCompanion(method, "Recommender");
+    ConfigDef.Recommender userProvided =
+        (ConfigDef.Recommender) invokeCompanion(method, "Recommender");
     if (userProvided != null) {
       return userProvided;
     }
@@ -460,8 +432,7 @@ public class KafkaConfigProxyFactory {
   }
 
   protected Object getDefaultValue(Method method) {
-    return getAnnotation(method, Default.class)
-        .map(a -> (Object) a.value())
+    return getAnnotation(method, Default.class).map(a -> (Object) a.value())
         .orElse(ConfigDef.NO_DEFAULT_VALUE);
   }
 
@@ -481,9 +452,8 @@ public class KafkaConfigProxyFactory {
   }
 
   /**
-   * Exposes the {@link AbstractConfig#get(String)} method so the dynamic proxy
-   * doesn't need to call the type-specific methods (like getString, getBoolean,
-   * etc).
+   * Exposes the {@link AbstractConfig#get(String)} method so the dynamic proxy doesn't need to call
+   * the type-specific methods (like getString, getBoolean, etc).
    */
   public static class ConcreteKafkaConfig extends AbstractConfig {
     public ConcreteKafkaConfig(ConfigDef definition, Map<?, ?> originals, boolean doLog) {
@@ -495,14 +465,13 @@ public class KafkaConfigProxyFactory {
     }
   }
 
-  protected static <T extends Annotation> Optional<T> getAnnotation(Method method, Class<T> annotationClass) {
+  protected static <T extends Annotation> Optional<T> getAnnotation(Method method,
+      Class<T> annotationClass) {
     T annotation = method.getAnnotation(annotationClass);
     if (annotation != null) {
       return Optional.of(annotation);
     }
-    return Optional.ofNullable(
-        method.getDeclaringClass()
-            .getAnnotation(annotationClass));
+    return Optional.ofNullable(method.getDeclaringClass().getAnnotation(annotationClass));
   }
 
   protected String getConfigKeyName(Method method) {
@@ -510,19 +479,15 @@ public class KafkaConfigProxyFactory {
   }
 
   protected static String lowerCamelCaseToDottedLowerCase(String name) {
-    return name.replaceAll("(\\p{javaUpperCase})", ".$1")
-        .toLowerCase(Locale.ROOT);
+    return name.replaceAll("(\\p{javaUpperCase})", ".$1").toLowerCase(Locale.ROOT);
   }
 
   protected ConfigDef.Width getWidth(Method method) {
-    return getAnnotation(method, Width.class)
-        .map(Width::value)
-        .orElse(ConfigDef.Width.NONE);
+    return getAnnotation(method, Width.class).map(Width::value).orElse(ConfigDef.Width.NONE);
   }
 
   protected ConfigDef.Importance getImportance(Method method) {
-    return getAnnotation(method, Importance.class)
-        .map(Importance::value)
+    return getAnnotation(method, Importance.class).map(Importance::value)
         .orElse(ConfigDef.Importance.MEDIUM);
   }
 
@@ -533,15 +498,16 @@ public class KafkaConfigProxyFactory {
     MethodJavadoc methodJavadoc = RuntimeJavadoc.getJavadoc(method);
     javadoc.append(methodJavadoc.getComment().toString());
 
-    getEnvironmentVariableName(method)
-        .ifPresent(envar -> javadoc.append("<p>May be overridden with the " + envar + " environment variable."));
+    getEnvironmentVariableName(method).ifPresent(envar -> javadoc
+        .append("<p>May be overridden with the " + envar + " environment variable."));
 
     Stability.Uncommitted uncommitted = method.getAnnotation(Stability.Uncommitted.class);
     if (uncommitted != null) {
       javadoc.append("<p>UNCOMMITTED; this feature may change in a patch release without notice.");
     }
 
-    deprecated(methodJavadoc).ifPresent(message -> javadoc.append("<p>WARNING: *DEPRECATED.* " + message));
+    deprecated(methodJavadoc)
+        .ifPresent(message -> javadoc.append("<p>WARNING: *DEPRECATED.* " + message));
 
     List<String> since = since(methodJavadoc);
     if (!since.isEmpty()) {
@@ -551,7 +517,7 @@ public class KafkaConfigProxyFactory {
     return HtmlRenderer.htmlToPlaintext(javadoc.toString());
   }
 
-  @SuppressWarnings({ "unchecked", "rawtypes" })
+  @SuppressWarnings({"unchecked", "rawtypes"})
   protected Enum<?> parseEnum(Class<?> enumClass, String value) {
     return Enum.valueOf((Class) enumClass, value);
   }

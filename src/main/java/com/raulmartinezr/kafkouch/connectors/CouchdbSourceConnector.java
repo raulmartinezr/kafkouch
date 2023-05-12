@@ -14,7 +14,12 @@ import java.util.jar.Manifest;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.Task;
 import org.apache.kafka.connect.source.SourceConnector;
+import org.slf4j.MDC;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import com.raulmartinezr.kafkouch.connectors.config.ConfigHelper;
+import com.raulmartinezr.kafkouch.connectors.config.source.CouchdbSourceConfig;
 import com.raulmartinezr.kafkouch.couchdb.CouchdbChangesFeedReader;
 import com.raulmartinezr.kafkouch.couchdb.CouchdbChangesFeedReader.CouchdbChangesFeedReaderBuilder;
 import com.raulmartinezr.kafkouch.couchdb.CouchdbClient.CouchdbAuthMethod;
@@ -22,13 +27,12 @@ import com.raulmartinezr.kafkouch.couchdb.feed.ContinuousFeedEntry;
 
 public class CouchdbSourceConnector extends SourceConnector {
 
+  private static final Logger log = LoggerFactory.getLogger(CouchdbSourceConnector.class);
+
   BlockingQueue<ContinuousFeedEntry> changesQueue = null;
   CouchdbChangesFeedReader couchdbChangesFeedReader = null;
   ReconfigurationThread reconfigurationThread = null;
-
-  private static final ConfigDef CONFIG_DEF = new ConfigDef()
-    .define(FILE_CONFIG, Type.STRING, Importance.HIGH, "Source filename.")
-    .define(TOPIC_CONFIG, Type.STRING, Importance.HIGH, "The topic to publish data to");
+  private Map<String, String> configProperties;
 
   @Override
   public String version() {
@@ -37,20 +41,24 @@ public class CouchdbSourceConnector extends SourceConnector {
 
   @Override
   public ConfigDef config() {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'config'");
+    return ConfigHelper.define(CouchdbSourceConfig.class);
   }
 
   @Override
-  public void start(Map<String, String> arg0) {
+  public void start(Map<String, String> properties) {
     /*
      * Starts connector
      */
+    this.configProperties = properties;
+    CouchdbSourceConfig config =
+        ConfigHelper.parse(CouchdbSourceConfig.class, this.configProperties);
+    this.setLogLevel(config.logLevel().toString());
+
     changesQueue = new LinkedBlockingQueue<ContinuousFeedEntry>();
-    this.couchdbChangesFeedReader = new CouchdbChangesFeedReaderBuilder()
-        .setUrl(arg0.get("couchdb.url")).setUsername(arg0.get("couchdb.username"))
-        .setPassword(arg0.get("couchdb.password")).setAuthMethod(CouchdbAuthMethod.COOKIE)
-        .setConnect(true).setSince(arg0.get("since")).setChangesQueue(changesQueue).build();
+    this.couchdbChangesFeedReader = new CouchdbChangesFeedReaderBuilder().setUrl(config.url())
+        .setUsername(config.username()).setPassword(config.password().value())
+        .setAuthMethod(config.authMethod()).setConnect(true).setSince(properties.get("since"))
+        .setChangesQueue(changesQueue).build();
 
     this.couchdbChangesFeedReader.startReadingChangesFeed();
     this.manageReconfigurationsBasedOnChanges();
@@ -103,6 +111,16 @@ public class CouchdbSourceConnector extends SourceConnector {
       }
     }
     return null;
+  }
+
+  private void setLogLevel(String logLevel) {
+    if (logLevel == null || !logLevel.matches("(TRACE|DEBUG|INFO|WARN|ERROR)")) {
+      log.warn("Invalid log level: " + logLevel);
+    } else {
+      // Set log level in MDC context
+      MDC.put("logLevel", logLevel);
+    }
+
   }
 
 }

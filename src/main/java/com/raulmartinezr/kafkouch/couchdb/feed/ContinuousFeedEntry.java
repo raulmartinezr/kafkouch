@@ -5,9 +5,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 public class ContinuousFeedEntry {
 
   public enum Type {
-    CREATED("created"),
-    UPDATED("updated"),
-    DELETED("deleted");
+    CREATED("created"), UPDATED("updated"), DELETED("deleted");
 
     private final String value;
 

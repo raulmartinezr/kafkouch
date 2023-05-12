@@ -1,6 +1,7 @@
 package com.raulmartinezr.kafkouch.couchdb;
 
-import java.util.concurrent.BlockingQueue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import okhttp3.Credentials;
 import okhttp3.FormBody;
@@ -8,11 +9,11 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-import okhttp3.WebSocket;
-import okhttp3.WebSocketListener;
-import okhttp3.Request.Builder;
+
 
 public class CouchdbClient {
+
+  private static final Logger log = LoggerFactory.getLogger(CouchdbClient.class);
 
   private boolean authenticated = false;
   private String url;
@@ -83,8 +84,15 @@ public class CouchdbClient {
 
   public void authenticate() {
     switch (this.authMethod) {
-      case BASIC -> this.authenticateBasic();
-      case COOKIE -> this.authenticateCookie();
+      case BASIC:
+        this.authenticateBasic();
+        break;
+      case COOKIE:
+        this.authenticateCookie();
+        break;
+      default:
+        log.warn("Authentication method {} not supported", this.authMethod);
+        break;
     }
   }
 
@@ -115,8 +123,6 @@ public class CouchdbClient {
     }
 
   }
-
-
 
   // private Response doRequest(Request request) {
   // Builder newBuilder = request.newBuilder();

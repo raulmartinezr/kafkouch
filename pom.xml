@@ -45,6 +45,8 @@
 		<okhttp.version>4.10.0</okhttp.version>
 		<runtime.javadoc.version>0.13.0</runtime.javadoc.version>
 		<jsoup.version>1.16.1</jsoup.version>
+		<logback.version>1.4.7</logback.version>
+		<slf4j.version>2.0.7</slf4j.version>
 	</properties>
 
 
@@ -76,6 +78,19 @@
             <artifactId>jsoup</artifactId>
             <version>${jsoup.version}</version>
         </dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>${slf4j.version}</version>
+   		 </dependency>
+
+			<!-- Logback (implementation of SLF4J) -->
+			<dependency>
+				<groupId>ch.qos.logback</groupId>
+				<artifactId>logback-classic</artifactId>
+				<version>${logback.version}</version>
+			</dependency>
+
 <!-- Thanks for using https://jar-download.com -->
 
 

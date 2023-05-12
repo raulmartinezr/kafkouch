@@ -6,12 +6,11 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Specifies the display name of the config key, overriding
- * the default inference strategy (which is to capitalize
- * the method name and insert a space between capital letters).
+ * Specifies the display name of the config key, overriding the default inference strategy (which is
+ * to capitalize the method name and insert a space between capital letters).
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 public @interface DisplayName {
-    String value();
+  String value();
 }

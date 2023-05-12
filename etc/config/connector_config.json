@@ -1,0 +1,8 @@
+{
+    "name": "test",
+    "connector.class": "com.raulmartinezr.kafkouch.connectors.CouchdbSourceConnector",
+    "couchdb.password": "admin",
+    "couchdb.username": "admin",
+    "couchdb.auth.method": "COOKIE",
+    "couchdb.url": "http://couchdb:5984"
+  }
