@@ -1,29 +1,46 @@
 package com.raulmartinezr.kafkouch.couchdb;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.raulmartinezr.kafkouch.couchdb.CouchdbClient.CouchdbAuthMethod;
 import com.raulmartinezr.kafkouch.couchdb.CouchdbClient.CouchdbClientBuilder;
 import com.raulmartinezr.kafkouch.couchdb.feed.ContinuousFeedEntry;
 import com.raulmartinezr.kafkouch.couchdb.feed.ContinuousFeedEntryConverter;
 
+import okhttp3.Cookie;
+import okhttp3.Headers;
+import okhttp3.HttpUrl;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.WebSocket;
 import okhttp3.WebSocketListener;
+import okio.Buffer;
 
 public class CouchdbChangesFeedReader {
+
+  private static final Logger log = LoggerFactory.getLogger(CouchdbChangesFeedReader.class);
 
   private CouchdbClient client;
   private String since;
   private FeedType feed;
-  private int heartbeat;
-  private int timeout;
+  private long heartbeat;
+  private long timeout;
   private int sleepTime = 1000;
   private boolean stopReading;
   private BlockingQueue<ContinuousFeedEntry> changesQueue;
@@ -32,90 +49,171 @@ public class CouchdbChangesFeedReader {
   private long maxBufferTimeInterval;
   private int maxBufferSize;
 
+  private CountDownLatch shutdownLatch;
+
   /**
    * Instantiates a new CouchdbClient.
    */
 
   public CouchdbChangesFeedReader(CouchdbChangesFeedReaderBuilder builder) {
 
-    this.client = new CouchdbClientBuilder().setUrl(builder.getUrl())
-        .setUsername(builder.getUsername()).setPassword(builder.getPassword())
-        .setAuthMethod(builder.getAuthMethod()).setConnect(builder.isConnect()).build();
+    this.client =
+        new CouchdbClientBuilder().setUrl(builder.getUrl()).setUsername(builder.getUsername())
+            .setPassword(builder.getPassword()).setAuthMethod(builder.getAuthMethod())
+            .setConnect(builder.isConnect()).setReadTimeout(builder.getReadTimeout()).build();
 
     this.since = builder.getSince();
     this.feed = builder.getFeed();
     this.heartbeat = builder.getHeartbeat();
     this.timeout = builder.getTimeout();
     this.changesQueue = builder.getChangesQueue();
-
     this.converter = new ContinuousFeedEntryConverter();
     this.buffer = null;
     this.maxBufferTimeInterval = builder.getMaxBufferTimeInterval();
     this.maxBufferSize = builder.getMaxBufferSize();
 
+    this.shutdownLatch = new CountDownLatch(1);
+
   }
 
   public void startReadingChangesFeed() {
-    String globalChangesFeedUrl = this.client.getUrl() + "/_db_updates?feed=" + this.feed.toString()
+    String globalChangesFeedUrl = this.client.getUrl() + "/_db_updates?feed=" + this.feed.value
         + "&heartbeat=" + this.heartbeat + "&timeout=" + this.timeout + "&since=" + this.since;
-    Request request = new Request.Builder().url(globalChangesFeedUrl).build();
+
+    List<Cookie> cookies =
+        this.client.getCookieJar().loadForRequest(HttpUrl.parse(this.client.getUrl()));
+    Headers.Builder headerBuilder = new Headers.Builder();
+
+    for (Cookie cookie : cookies) {
+      headerBuilder.add("Cookie", cookie.name() + "=" + cookie.value());
+    }
+
+    Request request =
+        new Request.Builder().url(globalChangesFeedUrl).headers(headerBuilder.build()).build();
 
     this.buffer = new OrderedBuffer<ContinuousFeedEntry>(this.maxBufferSize,
         this.maxBufferTimeInterval, this.changesQueue); // Buffer up to 10 elements or flush every 5
 
-    WebSocketListener listener = new WebSocketListener() {
-      @Override
-      public void onOpen(WebSocket webSocket, Response response) {
-        System.out.println("Connected to CouchDB changes feed.");
-        buffer.start();
-      }
+    try (Response response = this.client.getHttpClient().newCall(request).execute()) {
+      if (response.isSuccessful()) {
+        this.buffer.start();
+        InputStream inputStream = response.body().byteStream();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+        String line;
+        while ((line = reader.readLine()) != null && shutdownLatch.getCount() > 0) {
+          // Process each line of the response
+          log.info(line);
+          if (!line.isBlank()) {
+            ContinuousFeedEntry feedEntry = converter.convertToJavaObject(line);
+            buffer.add(feedEntry);
+          }
+        }
 
-      @Override
-      public void onMessage(WebSocket webSocket, String text) {
-        System.out.println("Received change: " + text);
-        ContinuousFeedEntry feedEntry = converter.convertToJavaObject(text);
-        buffer.add(feedEntry);
+        // Remember to close the input stream and reader when you're done
+        reader.close();
+        inputStream.close();
+        this.buffer.stop();
+      } else {
+        log.error("Error: " + response.code() + " " + response.message());
+        printFeedRequest(request);
       }
-
-      @Override
-      public void onClosing(WebSocket webSocket, int code, String reason) {
-        System.out.println("Closing connection to CouchDB changes feed.");
-        buffer.stop();
-      }
-
-      @Override
-      public void onFailure(WebSocket webSocket, Throwable t, Response response) {
-        System.err.println("Error: " + t.getMessage());
-      }
-    };
-    WebSocket webSocket = this.client.getHttpClient().newWebSocket(request, listener);
-    while (!this.stopReading) {
-      try {
-        Thread.sleep(this.sleepTime);
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-        break;
-      }
-
+    } catch (IOException e) {
+      log.error("Request failed: " + e.getMessage(), e);
+      printFeedRequest(request);
     }
-    webSocket.close(1000, "Closing WebSocket");
+
+    // WebSocketListener listener = new WebSocketListener() {
+    // @Override
+    // public void onOpen(WebSocket webSocket, Response response) {
+    // System.out.println("Connected to CouchDB changes feed.");
+    // buffer.start();
+    // }
+
+    // @Override
+    // public void onMessage(WebSocket webSocket, String text) {
+    // System.out.println("Received change: " + text);
+    // ContinuousFeedEntry feedEntry = converter.convertToJavaObject(text);
+    // buffer.add(feedEntry);
+    // }
+
+    // @Override
+    // public void onClosing(WebSocket webSocket, int code, String reason) {
+    // System.out.println("Closing connection to CouchDB changes feed.");
+    // buffer.stop();
+    // }
+
+    // @Override
+    // public void onFailure(WebSocket webSocket, Throwable t, Response response) {
+    // System.err.println("Error: " + t.getMessage());
+    // printFeedRequest(request);
+    // }
+    // };
+    // WebSocket webSocket = this.client.getHttpClient().newWebSocket(request,
+    // listener);
+    // while (!this.stopReading) {
+    // try {
+    // Thread.sleep(this.sleepTime);
+    // } catch (InterruptedException e) {
+    // break;
+    // }
+
+    // }
+    // webSocket.close(1000, "Closing WebSocket");
     this.client.getHttpClient().dispatcher().executorService().shutdown();
 
   }
 
+  private void printFeedRequest(Request request) {
+    log.info("Request URL: " + request.url());
+    log.info("Request Method: " + request.method());
+    log.info("Headers: ");
+    Headers headers = request.headers();
+    for (String name : headers.names()) {
+      log.info(name + ": " + headers.get(name));
+
+    }
+    RequestBody requestBody = request.body();
+    if (requestBody != null) {
+      log.info("Request Body: " + requestBodyToString(requestBody));
+    }
+  }
+
+  private static String requestBodyToString(RequestBody requestBody) {
+    Buffer buffer = new Buffer();
+    try {
+      requestBody.writeTo(buffer);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    return buffer.readUtf8();
+  }
+
   public void stopReadingChangesFeed() {
-    this.stopReading = true;
+    log.info("Shutting down couchdb changes feed reader");
+    shutdownLatch.countDown();
   }
 
   public enum FeedType {
-    NORMAL, LONGPOOLL, CONTINUOUS, EVENTSOURCE
+    NORMAL("normal"), LONGPOOLL("longpoll"), CONTINUOUS("continuous"), EVENTSOURCE("eventsource");
+
+    private final String value;
+
+    FeedType(String value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
   }
 
   public static class CouchdbChangesFeedReaderBuilder {
 
     private BlockingQueue<ContinuousFeedEntry> changesQueue;
-    private int heartbeat = 60000;
-    private int timeout = 60000;
+    private long heartbeat = 60000;
+    private long timeout = 60000;
+    private long readTimeout = 60000;
     private FeedType feed = FeedType.CONTINUOUS;
     private String since = "now";
     private boolean connect = true;
@@ -205,7 +303,7 @@ public class CouchdbChangesFeedReader {
     /**
      * @param heartbeat the heartbeat to set
      */
-    public CouchdbChangesFeedReaderBuilder setHeartbeat(int heartbeat) {
+    public CouchdbChangesFeedReaderBuilder setHeartbeat(long heartbeat) {
       this.heartbeat = heartbeat;
       return this;
     }
@@ -213,7 +311,7 @@ public class CouchdbChangesFeedReader {
     /**
      * @param timeout the timeout to set
      */
-    public CouchdbChangesFeedReaderBuilder setTimeout(int timeout) {
+    public CouchdbChangesFeedReaderBuilder setTimeout(long timeout) {
       this.timeout = timeout;
       return this;
     }
@@ -247,6 +345,14 @@ public class CouchdbChangesFeedReader {
      */
     public CouchdbChangesFeedReaderBuilder setMaxBufferTimeInterval(long maxBufferTimeInterval) {
       this.maxBufferTimeInterval = maxBufferTimeInterval;
+      return this;
+    }
+
+    /**
+     * @param readTimeout the readTimeout to set
+     */
+    public CouchdbChangesFeedReaderBuilder setReadTimeout(long readTimeout) {
+      this.readTimeout = readTimeout;
       return this;
     }
 
@@ -295,14 +401,14 @@ public class CouchdbChangesFeedReader {
     /**
      * @return the heartbeat
      */
-    public int getHeartbeat() {
+    public long getHeartbeat() {
       return heartbeat;
     }
 
     /**
      * @return the timeout
      */
-    public int getTimeout() {
+    public long getTimeout() {
       return timeout;
     }
 
@@ -334,9 +440,19 @@ public class CouchdbChangesFeedReader {
       return maxBufferTimeInterval;
     }
 
+    /**
+     * @return the readTimeout
+     */
+    public long getReadTimeout() {
+      return readTimeout;
+    }
+
   }
 
   public class OrderedBuffer<T> {
+
+    private final Logger log = LoggerFactory.getLogger(OrderedBuffer.class);
+
     private BlockingDeque<T> buffer;
     private int maxBufferSize;
     private long maxTimeInterval;
@@ -352,18 +468,30 @@ public class CouchdbChangesFeedReader {
     }
 
     public void start() {
+      log.info("Starting OrderedBuffer flush timer");
       flushTimer.schedule(new FlushTask(), maxTimeInterval, maxTimeInterval);
     }
 
     public void stop() {
+      log.info("Stopping OrderedBuffer flush timer");
       flushTimer.cancel();
       flush();
+    }
+
+    public void reset() {
+      log.info("Reseting OrderedBuffer flush timer");
+      flushTimer.cancel();
+      flushTimer = new Timer();
+      flushTimer.schedule(new FlushTask(), maxTimeInterval, maxTimeInterval);
     }
 
     public void add(T data) {
       buffer.offer(data);
       if (buffer.size() >= maxBufferSize) {
+        log.info("New size {}. Max buffer size of {} reached, flushing...", buffer.size(),
+            maxBufferSize);
         flush();
+        reset();
       }
     }
 
@@ -383,6 +511,7 @@ public class CouchdbChangesFeedReader {
     private class FlushTask extends TimerTask {
       @Override
       public void run() {
+        log.info("Flushing buffer due to timer");
         flush();
       }
     }

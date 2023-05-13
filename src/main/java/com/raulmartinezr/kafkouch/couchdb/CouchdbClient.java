@@ -1,15 +1,22 @@
 package com.raulmartinezr.kafkouch.couchdb;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import okhttp3.Cookie;
+import okhttp3.CookieJar;
 import okhttp3.Credentials;
 import okhttp3.FormBody;
+import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-
 
 public class CouchdbClient {
 
@@ -21,7 +28,9 @@ public class CouchdbClient {
   private String password;
   private CouchdbAuthMethod authMethod;
   private OkHttpClient httpClient;
+  private CookieJar cookieJar;
   private String credentials;
+  private long readTimeout = Integer.MAX_VALUE;
 
   /**
    * Instantiates a new CouchdbClient.
@@ -32,12 +41,36 @@ public class CouchdbClient {
     this.username = builder.getUsername();
     this.password = builder.getPassword();
     this.authMethod = builder.getAuthMethod();
-    okhttp3.OkHttpClient.Builder httpClientBuilder = new OkHttpClient.Builder();
+    this.readTimeout = builder.getReadTimeout();
+    okhttp3.OkHttpClient.Builder httpClientBuilder =
+        new OkHttpClient.Builder().readTimeout(this.readTimeout, TimeUnit.MILLISECONDS);
+    this.cookieJar = this.buildCookieJar();
+    this.httpClient = httpClientBuilder.cookieJar(cookieJar).build();
+
     if (this.authMethod == CouchdbAuthMethod.COOKIE) {
       httpClientBuilder.addInterceptor(
           new AuthenticatorInterceptor(this.httpClient, this.url, this.username, this.password));
     }
-    this.httpClient = httpClientBuilder.build();
+
+  }
+
+  private CookieJar buildCookieJar() {
+    CookieJar cookieJar = new CookieJar() {
+      private final HashMap<String, List<Cookie>> cookieStore = new HashMap<>();
+
+      @Override
+      public void saveFromResponse(HttpUrl url, List<Cookie> cookies) {
+        cookieStore.put(url.host(), cookies);
+      }
+
+      @Override
+      public List<Cookie> loadForRequest(HttpUrl url) {
+        List<Cookie> cookies = cookieStore.get(url.host());
+        return cookies != null ? cookies : new ArrayList<>();
+      }
+
+    };
+    return cookieJar;
   }
 
   /**
@@ -80,6 +113,20 @@ public class CouchdbClient {
    */
   public OkHttpClient getHttpClient() {
     return httpClient;
+  }
+
+  /**
+   * @return the cookieJar
+   */
+  public CookieJar getCookieJar() {
+    return cookieJar;
+  }
+
+  /**
+   * @return the readTimeout
+   */
+  public long getReadTimeout() {
+    return readTimeout;
   }
 
   public void authenticate() {
@@ -143,6 +190,7 @@ public class CouchdbClient {
     private String username;
     private String password;
     private CouchdbAuthMethod authMethod;
+    private long readTimeout = Long.MAX_VALUE;
 
     public CouchdbClientBuilder() {}
 
@@ -211,6 +259,13 @@ public class CouchdbClient {
     }
 
     /**
+     * @return the readTimeout
+     */
+    public long getReadTimeout() {
+      return readTimeout;
+    }
+
+    /**
      * @return the connect
      */
     public boolean isConnect() {
@@ -243,6 +298,14 @@ public class CouchdbClient {
      */
     public CouchdbAuthMethod getAuthMethod() {
       return authMethod;
+    }
+
+    /**
+     * @param readTimeout the readTimeout to set
+     */
+    public CouchdbClientBuilder setReadTimeout(long readTimeout) {
+      this.readTimeout = readTimeout;
+      return this;
     }
 
   }

@@ -1,5 +1,6 @@
 package com.raulmartinezr.kafkouch.couchdb.feed;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
 
 public class ContinuousFeedEntry {
@@ -19,18 +20,21 @@ public class ContinuousFeedEntry {
     }
   }
 
-  private String db_name;
+  @JsonProperty("db_name")
+  private String dbName;
+  @JsonProperty("type")
   private Type type;
-  private long seq;
+  @JsonProperty("seq")
+  private String seq;
 
   // Getters and setters
 
   public String getDbName() {
-    return db_name;
+    return dbName;
   }
 
-  public void setDbName(String db_name) {
-    this.db_name = db_name;
+  public void setDbName(String dbName) {
+    this.dbName = dbName;
   }
 
   public Type getType() {
@@ -41,11 +45,11 @@ public class ContinuousFeedEntry {
     this.type = type;
   }
 
-  public long getSeq() {
+  public String getSeq() {
     return seq;
   }
 
-  public void setSeq(long seq) {
+  public void setSeq(String seq) {
     this.seq = seq;
   }
 }

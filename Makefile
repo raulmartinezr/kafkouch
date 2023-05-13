@@ -57,4 +57,7 @@ docker-dev-up: ## start the environment
 docker-dev-down: ## stop the environment
 	docker-compose -f docker/dev/docker-compose.yml down
 
+docker-dev-stop: ## stop the environment
+	docker-compose -f docker/dev/docker-compose.yml stop
+
 stop: docker-dev-down

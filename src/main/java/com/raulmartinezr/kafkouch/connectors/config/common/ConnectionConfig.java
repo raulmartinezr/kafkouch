@@ -18,7 +18,8 @@ public interface ConnectionConfig {
   /**
    * Address of Couchdb server URL.
    * <p>
-   * If a custom port is specified, it must be the KV port (which is normally 11210 for insecure
+   * If a custom port is specified, it must be the KV port (which is normally
+   * 11210 for insecure
    * connections, or 11207 for secure connections).
    */
   @Width(LONG)
@@ -46,9 +47,22 @@ public interface ConnectionConfig {
   CouchdbAuthMethod authMethod();
 
   /**
-   * On startup, the connector will wait this long for a couchdeb connection to be established. If a
-   * connection is not established before the timeout expires, the connector will terminate.
+   * On startup, the connector will wait this long for a couchdeb connection to be
+   * established. If a
+   * connection is not established before the timeout expires, the connector will
+   * terminate.
    */
   @Default("30s")
   Duration bootstrapTimeout();
+
+  /**
+   * Maximum amount of time that a client will wait for a response from the server
+   * after sending a
+   * request. It measures the duration for which the client is willing to wait to
+   * receive data from
+   * the server
+   */
+  @Default("60s")
+  Duration httpTimeout();
+
 }

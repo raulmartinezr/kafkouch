@@ -122,4 +122,5 @@ public interface SourceBehaviorConfig {
    */
   @Default
   List<String> collections();
+
 }

@@ -10,10 +10,10 @@ COUCHDB_USERNAME = 'admin'
 COUCHDB_PASSWORD = 'admin'
 
 # Number of databases to create
-NUM_DATABASES = 5
+NUM_DATABASES = 20
 
 # Documents per minute rate
-DOCS_PER_MINUTE = 100
+DOCS_PER_MINUTE = 10000
 
 # Document field lengths
 FIELD_LENGTH = 10
