@@ -25,6 +25,6 @@ replay_pid*
 
 
 docker/dev/data
-target
+target/*
 dependency-reduced-pom.xml
 plugins
