@@ -6,7 +6,6 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.Task;
 import org.apache.kafka.connect.source.SourceConnector;
@@ -19,6 +18,7 @@ import com.raulmartinezr.kafkouch.connectors.config.source.CouchdbSourceConfig;
 import com.raulmartinezr.kafkouch.connectors.config.source.CouchdbSourceTaskConfig;
 import com.raulmartinezr.kafkouch.couchdb.feed.ContinuousFeedEntry;
 import com.raulmartinezr.kafkouch.tasks.CouchdbSourceTask;
+import com.raulmartinezr.kafkouch.util.ThreadSafeSetHandler;
 import com.raulmartinezr.kafkouch.util.Version;
 
 import static com.raulmartinezr.kafkouch.connectors.config.ConfigHelper.keyName;
@@ -26,8 +26,11 @@ import static com.raulmartinezr.kafkouch.connectors.config.ConfigHelper.keyName;
 public class CouchdbSourceConnector extends SourceConnector {
 
   private static final Logger log = LoggerFactory.getLogger(CouchdbSourceConnector.class);
+  private CouchdbSourceConfig config;
 
   BlockingQueue<ContinuousFeedEntry> changesQueue = null;
+  ThreadSafeSetHandler<String> changedDatabases = null;
+
   FeedMonitorThread feedMonitorThread = null;
   private Map<String, String> configProperties;
 
@@ -47,11 +50,13 @@ public class CouchdbSourceConnector extends SourceConnector {
      * Starts connector
      */
     this.configProperties = properties;
-    CouchdbSourceConfig config =
-        ConfigHelper.parse(CouchdbSourceConfig.class, this.configProperties);
+    this.config = ConfigHelper.parse(CouchdbSourceConfig.class, this.configProperties);
     this.setLogLevel(config.logLevel().toString());
-    changesQueue = new LinkedBlockingQueue<ContinuousFeedEntry>();
-    this.feedMonitorThread = new FeedMonitorThread(this.changesQueue, context, config);
+
+    this.changesQueue = new LinkedBlockingQueue<ContinuousFeedEntry>();
+    this.changedDatabases = new ThreadSafeSetHandler<String>();
+    this.feedMonitorThread =
+        new FeedMonitorThread(this.changesQueue, this.changedDatabases, context, config);
     this.feedMonitorThread.start();
 
   }
@@ -78,6 +83,10 @@ public class CouchdbSourceConnector extends SourceConnector {
      * Each entry is the configuration for a single task. Then we can control here the numner of
      * tasks and the configuration for each one of them.
      */
+
+    this.config.collections();
+    this.config.databases();
+
     String taskIdKey = keyName(CouchdbSourceTaskConfig.class, CouchdbSourceTaskConfig::maybeTaskId);
 
     List<Map<String, String>> taskConfigs = new ArrayList<>();

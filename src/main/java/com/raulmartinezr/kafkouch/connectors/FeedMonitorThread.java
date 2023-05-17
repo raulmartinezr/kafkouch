@@ -13,12 +13,14 @@ import com.raulmartinezr.kafkouch.connectors.config.source.CouchdbSourceConfig;
 import com.raulmartinezr.kafkouch.couchdb.CouchdbChangesFeedReader;
 import com.raulmartinezr.kafkouch.couchdb.CouchdbChangesFeedReader.CouchdbChangesFeedReaderBuilder;
 import com.raulmartinezr.kafkouch.couchdb.feed.ContinuousFeedEntry;
+import com.raulmartinezr.kafkouch.util.ThreadSafeSetHandler;
 
 class FeedMonitorThread extends Thread {
 
   private static final Logger log = LoggerFactory.getLogger(FeedMonitorThread.class);
 
   private BlockingQueue<ContinuousFeedEntry> changesQueue = null;
+  private ThreadSafeSetHandler<String> changedDatabases = null;
   private CountDownLatch shutdownLatch;
   private ConnectorContext context;
   private CouchdbChangesFeedReader couchdbChangesFeedReader = null;
@@ -28,8 +30,10 @@ class FeedMonitorThread extends Thread {
    *
    */
   public FeedMonitorThread(BlockingQueue<ContinuousFeedEntry> changesQueue,
-      ConnectorContext context, CouchdbSourceConfig sourceConfig) {
+      ThreadSafeSetHandler<String> changedDatabases, ConnectorContext context,
+      CouchdbSourceConfig sourceConfig) {
     this.changesQueue = changesQueue;
+    this.changedDatabases = changedDatabases;
     this.context = context;
     this.sourceConfig = sourceConfig;
     this.shutdownLatch = new CountDownLatch(1);
@@ -68,7 +72,8 @@ class FeedMonitorThread extends Thread {
     this.couchdbChangesFeedReader = new CouchdbChangesFeedReaderBuilder().setUrl(sourceConfig.url())
         .setUsername(sourceConfig.username()).setPassword(sourceConfig.password().value())
         .setAuthMethod(sourceConfig.authMethod()).setConnect(true).setSince(sourceConfig.since())
-        .setChangesQueue(changesQueue).setHeartbeat(sourceConfig.feedHeartbeat().toMillis())
+        .setChangesQueue(changesQueue).setChangedDatabases(changedDatabases)
+        .setHeartbeat(sourceConfig.feedHeartbeat().toMillis())
         .setTimeout(sourceConfig.feedTimeout().toMillis())
         .setMaxBufferSize(sourceConfig.feedReaderBufferSize())
         .setMaxBufferTimeInterval(sourceConfig.feedReaderBufferTimerInterval().toMillis())

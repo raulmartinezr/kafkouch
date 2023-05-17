@@ -5,7 +5,7 @@ COUCHDB_SERVER = 'http://localhost:5984'
 COUCHDB_USERNAME = 'admin'
 COUCHDB_PASSWORD = 'admin'
 # Number of databases to create
-NUM_DATABASES = 5
+NUM_DATABASES = 20
 # List of database names to delete
 database_names = ['database1', 'database2', 'database3']
 
