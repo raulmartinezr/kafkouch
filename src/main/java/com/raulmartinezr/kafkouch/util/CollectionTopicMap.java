@@ -7,8 +7,8 @@ import java.util.function.Function;
 
 import static java.util.stream.Collectors.toMap;
 
-public class TopicMap {
-  private TopicMap() {
+public class CollectionTopicMap {
+  private CollectionTopicMap() {
     throw new AssertionError("not instantiable");
   }
 
