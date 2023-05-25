@@ -47,6 +47,8 @@
 		<jsoup.version>1.16.1</jsoup.version>
 		<logback.version>1.4.7</logback.version>
 		<slf4j.version>2.0.7</slf4j.version>
+		<jmeshpath.version>0.5.1</jmeshpath.version>
+
 	</properties>
 
 
@@ -90,8 +92,19 @@
 				<artifactId>logback-classic</artifactId>
 				<version>${logback.version}</version>
 			</dependency>
+		<dependency>
+			<groupId>io.burt</groupId>
+			<artifactId>jmespath-core</artifactId>
+			<version>${jmeshpath.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.burt</groupId>
+			<artifactId>jmespath-jackson</artifactId>
+			<version>${jmeshpath.version}</version>
+		</dependency>
 
-<!-- Thanks for using https://jar-download.com -->
+
+
 
 
 

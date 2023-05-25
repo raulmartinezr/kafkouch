@@ -1,6 +1,7 @@
 package com.raulmartinezr.kafkouch.util;
 
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
@@ -13,11 +14,14 @@ public class EnabledCollectionsType {
 
   public static EnabledCollectionsType parse(String enabledCollectionsType) {
     String[] split = enabledCollectionsType.split("|", -1);
-    if (split.length == 0) {
-      throw new IllegalArgumentException("Bad entry: '" + enabledCollectionsType
-          + "'. Expected at least one enabled collection.");
+    List<String> splitList =
+        Arrays.stream(split).filter(str -> !str.isEmpty()).collect(Collectors.toList());
+
+    if (splitList.size() == 0) {
+      throw new IllegalArgumentException(
+          "Bad entry: '" + enabledCollectionsType + "'. Expected at least one enabled collection.");
     }
-    return new EnabledCollectionsType(new ArrayList<>(Arrays.asList(split)));
+    return new EnabledCollectionsType(splitList);
   }
 
   public EnabledCollectionsType(List<String> enabledCollections) {

@@ -13,11 +13,16 @@ import org.slf4j.MDC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.raulmartinezr.kafkouch.connectors.config.ConfigHelper;
 import com.raulmartinezr.kafkouch.connectors.config.source.CouchdbSourceConfig;
 import com.raulmartinezr.kafkouch.connectors.config.source.CouchdbSourceTaskConfig;
 import com.raulmartinezr.kafkouch.couchdb.feed.ContinuousFeedEntry;
 import com.raulmartinezr.kafkouch.tasks.CouchdbSourceTask;
+import com.raulmartinezr.kafkouch.util.CollectionFilterMap;
+import com.raulmartinezr.kafkouch.util.CollectionTopicMap;
+import com.raulmartinezr.kafkouch.util.DatabaseCollectionsMap;
 import com.raulmartinezr.kafkouch.util.ThreadSafeSetHandler;
 import com.raulmartinezr.kafkouch.util.Version;
 
@@ -83,9 +88,26 @@ public class CouchdbSourceConnector extends SourceConnector {
      * Each entry is the configuration for a single task. Then we can control here the numner of
      * tasks and the configuration for each one of them.
      */
+    ObjectMapper objectMapper = new ObjectMapper();
 
-    this.config.collections();
-    this.config.databases();
+    try {
+      String json_collections = objectMapper.writerWithDefaultPrettyPrinter()
+          .writeValueAsString(CollectionFilterMap.parseCollectionToFilter(config.collections()));
+      System.out.println("Collections->Filters:");
+      System.out.println(json_collections);
+      String json_collection_topic =
+          objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(
+              CollectionTopicMap.parseCollectionToTopic(config.collectionToTopic()));
+      System.out.println("Collections->Topics:");
+      System.out.println(json_collection_topic);
+      String json_collection_in_dbs =
+          objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(
+              DatabaseCollectionsMap.parseDatabaseToCollections(config.collectionsInDatabases()));
+      System.out.println("DBs->Collections:");
+      System.out.println(json_collection_in_dbs);
+    } catch (JsonProcessingException e) {
+      e.printStackTrace();
+    }
 
     String taskIdKey = keyName(CouchdbSourceTaskConfig.class, CouchdbSourceTaskConfig::maybeTaskId);
 

@@ -4,5 +4,8 @@
     "couchdb.password": "admin",
     "couchdb.username": "admin",
     "couchdb.auth.method": "COOKIE",
-    "couchdb.url": "http://couchdb:5984"
+    "couchdb.url": "http://couchdb:5984",
+    "couchdb.collections": "users=doc_type==\"user\",visits=doc_type==\"visit\",accesses=doc_type==\"access\"",
+    "couchdb.collections.in.databases": "__all__=*",
+    "couchdb.collection.to.topic": "users=users,visits=visits,accesses=accesses"
   }

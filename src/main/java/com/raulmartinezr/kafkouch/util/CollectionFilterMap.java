@@ -7,33 +7,36 @@ import java.util.function.Function;
 
 import static java.util.stream.Collectors.toMap;
 
-// database-a=collection-a|collection-b,database-b-=collection-a
-public class DatabaseCollectionsMap {
-  private DatabaseCollectionsMap() {
+// collection-a=doc_type==`type-a`,collection-b=doc_type==`type-b`
+public class CollectionFilterMap {
+  private CollectionFilterMap() {
     throw new AssertionError("not instantiable");
   }
 
-  public static Map<String, EnabledCollectionsType> parseDatabaseToCollections(
-      List<String> toCollections) {
-    return mapValues(parseCommon(toCollections), EnabledCollectionsType::parse);
+  public static Map<String, CollectionFilterType> parseCollectionToFilter(
+      List<String> collectionTo) {
+    return mapValues(parseCommon(collectionTo), CollectionFilterType::parse);
   }
 
-  public static Map<EnabledCollectionsType, String> parseCollectionsToDatabase(
-      List<String> collectionsTo) {
-    return mapKeys(parseCommon(collectionsTo), EnabledCollectionsType::parse);
+  public static Map<CollectionFilterType, String> parseFilterToCollection(
+      List<String> toCollection) {
+    return mapKeys(parseCommon(toCollection), CollectionFilterType::parse);
   }
 
   private static Map<String, String> parseCommon(List<String> map) {
     Map<String, String> result = new HashMap<>();
+    String delimiter = "=";
     for (String entry : map) {
-      String[] components = entry.split("=", -1);
-      if (components.length != 2) {
+      int delimiterIndex = entry.indexOf(delimiter);
+      if (delimiterIndex == -1) {
         throw new IllegalArgumentException("Bad entry: '" + entry
-            + "'. Expected exactly one equals (=) character separating database and it's enabled collections.");
+            + "'. Expected exactly one equals (=) character separating collection and filter.");
       }
-      result.put(components[0], components[1]);
-    }
+      String firstPart = entry.substring(0, delimiterIndex);
+      String secondPart = entry.substring(delimiterIndex + 1);
 
+      result.put(firstPart, secondPart);
+    }
     return result;
   }
 
