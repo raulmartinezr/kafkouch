@@ -8,7 +8,6 @@ import org.apache.kafka.connect.connector.ConnectorContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.raulmartinezr.kafkouch.connectors.config.DurationParser;
 import com.raulmartinezr.kafkouch.connectors.config.source.CouchdbSourceConfig;
 import com.raulmartinezr.kafkouch.couchdb.CouchdbChangesFeedReader;
 import com.raulmartinezr.kafkouch.couchdb.CouchdbChangesFeedReader.CouchdbChangesFeedReaderBuilder;

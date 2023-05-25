@@ -17,7 +17,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.raulmartinezr.kafkouch.connectors.config.ConfigHelper;
 import com.raulmartinezr.kafkouch.connectors.config.source.CouchdbSourceConfig;
-import com.raulmartinezr.kafkouch.connectors.config.source.CouchdbSourceTaskConfig;
 import com.raulmartinezr.kafkouch.couchdb.feed.ContinuousFeedEntry;
 import com.raulmartinezr.kafkouch.tasks.CouchdbSourceTask;
 import com.raulmartinezr.kafkouch.util.CollectionFilterMap;
@@ -26,7 +25,6 @@ import com.raulmartinezr.kafkouch.util.DatabaseCollectionsMap;
 import com.raulmartinezr.kafkouch.util.ThreadSafeSetHandler;
 import com.raulmartinezr.kafkouch.util.Version;
 
-import static com.raulmartinezr.kafkouch.connectors.config.ConfigHelper.keyName;
 
 public class CouchdbSourceConnector extends SourceConnector {
 
@@ -109,7 +107,8 @@ public class CouchdbSourceConnector extends SourceConnector {
       e.printStackTrace();
     }
 
-    String taskIdKey = keyName(CouchdbSourceTaskConfig.class, CouchdbSourceTaskConfig::maybeTaskId);
+    // String taskIdKey = keyName(CouchdbSourceTaskConfig.class,
+    // CouchdbSourceTaskConfig::maybeTaskId);
 
     List<Map<String, String>> taskConfigs = new ArrayList<>();
     return taskConfigs;

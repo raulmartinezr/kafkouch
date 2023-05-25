@@ -4,10 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.lang.reflect.Field;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.BlockingDeque;
@@ -24,7 +21,6 @@ import com.raulmartinezr.kafkouch.couchdb.CouchdbClient.CouchdbAuthMethod;
 import com.raulmartinezr.kafkouch.couchdb.CouchdbClient.CouchdbClientBuilder;
 import com.raulmartinezr.kafkouch.couchdb.feed.ContinuousFeedEntry;
 import com.raulmartinezr.kafkouch.couchdb.feed.ContinuousFeedEntryConverter;
-import com.raulmartinezr.kafkouch.util.GenericClass;
 import com.raulmartinezr.kafkouch.util.ThreadSafeSetHandler;
 
 import okhttp3.Cookie;
@@ -33,8 +29,6 @@ import okhttp3.HttpUrl;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-import okhttp3.WebSocket;
-import okhttp3.WebSocketListener;
 import okio.Buffer;
 
 public class CouchdbChangesFeedReader {
@@ -46,8 +40,8 @@ public class CouchdbChangesFeedReader {
   private FeedType feed;
   private long heartbeat;
   private long timeout;
-  private int sleepTime = 1000;
-  private boolean stopReading;
+  // private int sleepTime = 1000;
+  // private boolean stopReading;
   private BlockingQueue<ContinuousFeedEntry> changesQueue;
   private ThreadSafeSetHandler<String> changedDatabases;
   private ContinuousFeedEntryConverter converter;
