@@ -50,6 +50,9 @@ lint: ## lint-> format and validate
 test: ## tests
 	mvn --no-transfer-progress clean jacoco:prepare-agent test jacoco:report
 
+dependency-tree: ## Show dependency tree
+	 mvn dependency:tree
+
 docker-dev-up: ## start the environment
 	mkdir -p docker/dev/deployments
 	docker-compose -f docker/dev/docker-compose.yml up -d
@@ -61,3 +64,6 @@ docker-dev-stop: ## stop the environment
 	docker-compose -f docker/dev/docker-compose.yml stop
 
 stop: docker-dev-down
+
+
+

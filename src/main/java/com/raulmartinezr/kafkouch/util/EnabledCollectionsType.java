@@ -1,20 +1,20 @@
 package com.raulmartinezr.kafkouch.util;
 
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
 import java.util.Arrays;
-import java.util.List;
 
 public class EnabledCollectionsType {
-  private final List<String> enabledCollections;
+  private final Set<String> enabledCollections;
 
   public static EnabledCollectionsType parse(String enabledCollectionsType) {
     String[] split = enabledCollectionsType.split("|", -1);
-    List<String> splitList =
-        Arrays.stream(split).filter(str -> !str.isEmpty()).collect(Collectors.toList());
+    Set<String> splitList =
+        Arrays.stream(split).filter(str -> !str.isEmpty()).collect(Collectors.toSet());
 
     if (splitList.size() == 0) {
       throw new IllegalArgumentException(
@@ -23,7 +23,7 @@ public class EnabledCollectionsType {
     return new EnabledCollectionsType(splitList);
   }
 
-  public EnabledCollectionsType(List<String> enabledCollections) {
+  public EnabledCollectionsType(Set<String> enabledCollections) {
     this.enabledCollections = requireNonNull(enabledCollections);
   }
 
@@ -45,7 +45,7 @@ public class EnabledCollectionsType {
   /**
    * @return the enabledCollections
    */
-  public List<String> getEnabledCollections() {
+  public Set<String> getEnabledCollections() {
     return enabledCollections;
   }
 }

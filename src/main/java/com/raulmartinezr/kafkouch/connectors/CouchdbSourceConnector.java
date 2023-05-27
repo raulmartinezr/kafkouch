@@ -1,10 +1,13 @@
 package com.raulmartinezr.kafkouch.connectors;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.stream.Collectors;
 
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.Task;
@@ -13,18 +16,23 @@ import org.slf4j.MDC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.raulmartinezr.kafkouch.connectors.config.ConfigHelper;
 import com.raulmartinezr.kafkouch.connectors.config.source.CouchdbSourceConfig;
+import com.raulmartinezr.kafkouch.connectors.config.source.CouchdbSourceTaskConfig;
 import com.raulmartinezr.kafkouch.couchdb.feed.ContinuousFeedEntry;
 import com.raulmartinezr.kafkouch.tasks.CouchdbSourceTask;
 import com.raulmartinezr.kafkouch.util.CollectionFilterMap;
+import com.raulmartinezr.kafkouch.util.CollectionFilterType;
 import com.raulmartinezr.kafkouch.util.CollectionTopicMap;
+import com.raulmartinezr.kafkouch.util.ConnectorLifecycle;
 import com.raulmartinezr.kafkouch.util.DatabaseCollectionsMap;
+import com.raulmartinezr.kafkouch.util.EnabledCollectionsSet;
+import com.raulmartinezr.kafkouch.util.EnabledCollectionsType;
 import com.raulmartinezr.kafkouch.util.ThreadSafeSetHandler;
 import com.raulmartinezr.kafkouch.util.Version;
 
+import static org.apache.kafka.connect.util.ConnectorUtils.groupPartitions;
+import static com.raulmartinezr.kafkouch.connectors.config.ConfigHelper.keyName;
 
 public class CouchdbSourceConnector extends SourceConnector {
 
@@ -36,6 +44,8 @@ public class CouchdbSourceConnector extends SourceConnector {
 
   FeedMonitorThread feedMonitorThread = null;
   private Map<String, String> configProperties;
+
+  private final ConnectorLifecycle lifecycle = new ConnectorLifecycle();
 
   @Override
   public String version() {
@@ -80,38 +90,108 @@ public class CouchdbSourceConnector extends SourceConnector {
     return CouchdbSourceTask.class;
   }
 
+  /*
+   * Each entry is the configuration for a single task. Then we can control here the numner of tasks
+   * and the configuration for each one of them.
+   */
   @Override
   public List<Map<String, String>> taskConfigs(int maxTasks) {
-    /*
-     * Each entry is the configuration for a single task. Then we can control here the numner of
-     * tasks and the configuration for each one of them.
-     */
-    ObjectMapper objectMapper = new ObjectMapper();
 
-    try {
-      String json_collections = objectMapper.writerWithDefaultPrettyPrinter()
-          .writeValueAsString(CollectionFilterMap.parseCollectionToFilter(config.collections()));
-      System.out.println("Collections->Filters:");
-      System.out.println(json_collections);
-      String json_collection_topic =
-          objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(
-              CollectionTopicMap.parseCollectionToTopic(config.collectionToTopic()));
-      System.out.println("Collections->Topics:");
-      System.out.println(json_collection_topic);
-      String json_collection_in_dbs =
-          objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(
-              DatabaseCollectionsMap.parseDatabaseToCollections(config.collectionsInDatabases()));
-      System.out.println("DBs->Collections:");
-      System.out.println(json_collection_in_dbs);
-    } catch (JsonProcessingException e) {
-      e.printStackTrace();
-    }
+    Map<String, EnabledCollectionsType> databaseToCollections =
+        DatabaseCollectionsMap.parseDatabaseToCollections(config.collectionsInDatabases());
+    Map<String, String> collectionToTopic =
+        CollectionTopicMap.parseCollectionToTopic(config.collectionToTopic());
+    Map<String, CollectionFilterType> collectionToFilter =
+        CollectionFilterMap.parseCollectionToFilter(config.collections());
+    lifecycle.logCollectionsUnAssigned(collectionToFilter, collectionToTopic,
+        databaseToCollections);
+
+    List<EnabledCollectionsSet> expandedDatabaseToCollections =
+        this.expandDatabaseToCollections(databaseToCollections, collectionToFilter);
+
+    List<List<EnabledCollectionsSet>> groupedDatabaseCollections =
+        groupPartitions(expandedDatabaseToCollections, maxTasks);
+
+    lifecycle.logCollectionsAssigned(groupedDatabaseCollections);
+
+    String taskCollectionsInDatabasesKey =
+        keyName(CouchdbSourceTaskConfig.class, CouchdbSourceTaskConfig::taskCollectionsInDatabases);
+    String taskIdKey = keyName(CouchdbSourceTaskConfig.class, CouchdbSourceTaskConfig::maybeTaskId);
 
     // String taskIdKey = keyName(CouchdbSourceTaskConfig.class,
     // CouchdbSourceTaskConfig::maybeTaskId);
-
+    int taskId = 0;
     List<Map<String, String>> taskConfigs = new ArrayList<>();
+    for (List<EnabledCollectionsSet> taskGroup : groupedDatabaseCollections) {
+      Map<String, String> taskProps = new HashMap<>(configProperties); // Initialize task props with
+                                                                       // global props
+      taskProps.put(taskCollectionsInDatabasesKey,
+          DatabaseCollectionsMap.formatDatabaseToCollections(taskGroup));
+      taskProps.put(taskIdKey, "maybe-" + taskId++);
+      taskConfigs.add(taskProps);
+    }
+
     return taskConfigs;
+  }
+
+  /**
+   * Expands the database to collections map to include all databases if keyword "__all__" is was
+   * included and all collections if keyword "*" was included for some database
+   *
+   * @param databaseToCollections
+   * @param collectionToFilter
+   * @return
+   */
+  private List<EnabledCollectionsSet> expandDatabaseToCollections(
+      Map<String, EnabledCollectionsType> databaseToCollections,
+      Map<String, CollectionFilterType> collectionToFilter) {
+    Map<String, EnabledCollectionsType> expandedDatabaseToCollections =
+        new HashMap<String, EnabledCollectionsType>();
+    boolean expandDatabases = databaseToCollections.containsKey("__all__");
+
+    Set<String> allCollections = collectionToFilter.keySet();
+    if (expandDatabases) {
+      List<String> allDatabases = this.getAllDatabases();
+      EnabledCollectionsType enabledCollectionsForAllDatabases =
+          databaseToCollections.get("__all__");
+      if (enabledCollectionsForAllDatabases.getEnabledCollections().contains("*")) {
+        enabledCollectionsForAllDatabases.getEnabledCollections().addAll(allCollections);
+      }
+      // Load expanded database collections map
+      for (String database : allDatabases) {
+        expandedDatabaseToCollections.put(database, enabledCollectionsForAllDatabases);
+      }
+    }
+    // Fill with configured values
+    for (String database : databaseToCollections.keySet()) {
+      if (!database.equals("__all__")) {
+        if (expandDatabases) {
+          expandedDatabaseToCollections.get(database).getEnabledCollections()
+              .addAll(expandCollections(databaseToCollections.get(database), allCollections)
+                  .getEnabledCollections());
+        } else {
+          expandedDatabaseToCollections.put(database,
+              expandCollections(databaseToCollections.get(database), allCollections));
+        }
+      }
+    }
+
+    List<EnabledCollectionsSet> mergedList = expandedDatabaseToCollections.entrySet().stream()
+        .map(entry -> new EnabledCollectionsSet(entry.getKey(), entry.getValue()))
+        .collect(Collectors.toList());
+    return mergedList;
+  }
+
+  private EnabledCollectionsType expandCollections(EnabledCollectionsType enabledCollections,
+      Set<String> allCollections) {
+    if (enabledCollections.getEnabledCollections().contains("*")) {
+      enabledCollections.getEnabledCollections().addAll(allCollections);
+    }
+    return enabledCollections;
+  }
+
+  private List<String> getAllDatabases() {
+    return null;
   }
 
   private void setLogLevel(String logLevel) {

@@ -7,6 +7,8 @@ import java.util.function.Function;
 
 import static java.util.stream.Collectors.toMap;
 
+import java.util.ArrayList;
+
 // database-a=collection-a|collection-b,database-b-=collection-a
 public class DatabaseCollectionsMap {
   private DatabaseCollectionsMap() {
@@ -21,6 +23,27 @@ public class DatabaseCollectionsMap {
   public static Map<EnabledCollectionsType, String> parseCollectionsToDatabase(
       List<String> collectionsTo) {
     return mapKeys(parseCommon(collectionsTo), EnabledCollectionsType::parse);
+  }
+
+  public static String formatDatabaseToCollections(
+      Map<String, EnabledCollectionsType> toCollections) {
+    List<String> formatDatabaseToCollections = new ArrayList<String>();
+    for (String toCollectionKey : toCollections.keySet()) {
+      String toCollectionValue =
+          String.join("|", toCollections.get(toCollectionKey).getEnabledCollections());
+      formatDatabaseToCollections.add(toCollectionKey + "=" + toCollectionValue);
+    }
+    return String.join(",", formatDatabaseToCollections);
+  }
+
+  public static String formatDatabaseToCollections(List<EnabledCollectionsSet> toCollections) {
+    List<String> formatDatabaseToCollections = new ArrayList<String>();
+    for (EnabledCollectionsSet toCollection : toCollections) {
+      String toCollectionValue =
+          String.join("|", toCollection.getEnabledCollectionsType().getEnabledCollections());
+      formatDatabaseToCollections.add(toCollection.getDatabase() + "=" + toCollectionValue);
+    }
+    return String.join(",", formatDatabaseToCollections);
   }
 
   private static Map<String, String> parseCommon(List<String> map) {
