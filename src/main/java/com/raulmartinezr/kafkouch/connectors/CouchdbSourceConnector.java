@@ -19,7 +19,6 @@ import org.slf4j.LoggerFactory;
 import com.raulmartinezr.kafkouch.connectors.config.ConfigHelper;
 import com.raulmartinezr.kafkouch.connectors.config.source.CouchdbSourceConfig;
 import com.raulmartinezr.kafkouch.connectors.config.source.CouchdbSourceTaskConfig;
-import com.raulmartinezr.kafkouch.couchdb.feed.ContinuousFeedEntry;
 import com.raulmartinezr.kafkouch.tasks.CouchdbSourceTask;
 import com.raulmartinezr.kafkouch.util.CollectionFilterMap;
 import com.raulmartinezr.kafkouch.util.CollectionFilterType;
@@ -28,7 +27,6 @@ import com.raulmartinezr.kafkouch.util.ConnectorLifecycle;
 import com.raulmartinezr.kafkouch.util.DatabaseCollectionsMap;
 import com.raulmartinezr.kafkouch.util.EnabledCollectionsSet;
 import com.raulmartinezr.kafkouch.util.EnabledCollectionsType;
-import com.raulmartinezr.kafkouch.util.ThreadSafeSetHandler;
 import com.raulmartinezr.kafkouch.util.Version;
 
 import static org.apache.kafka.connect.util.ConnectorUtils.groupPartitions;
@@ -39,8 +37,7 @@ public class CouchdbSourceConnector extends SourceConnector {
   private static final Logger log = LoggerFactory.getLogger(CouchdbSourceConnector.class);
   private CouchdbSourceConfig config;
 
-  BlockingQueue<ContinuousFeedEntry> changesQueue = null;
-  ThreadSafeSetHandler<String> changedDatabases = null;
+  RuntimeChangedResources RuntimeChangedResources = null;
 
   FeedMonitorThread feedMonitorThread = null;
   private Map<String, String> configProperties;
@@ -66,11 +63,16 @@ public class CouchdbSourceConnector extends SourceConnector {
     this.config = ConfigHelper.parse(CouchdbSourceConfig.class, this.configProperties);
     this.setLogLevel(config.logLevel().toString());
 
-    this.changesQueue = new LinkedBlockingQueue<ContinuousFeedEntry>();
-    this.changedDatabases = new ThreadSafeSetHandler<String>();
-    this.feedMonitorThread =
-        new FeedMonitorThread(this.changesQueue, this.changedDatabases, context, config);
+    RuntimeChangedResources = new RuntimeChangedResources();
+    /*
+     * Probably we would only need changed databases. The offset obtained in task will contain last
+     * seq read from database Using that as starting point would be enough. From changes queue maybe
+     * we could get the last seq read from database and use it as starting point in next glonal
+     * changes request
+     */
+    this.feedMonitorThread = new FeedMonitorThread(this.RuntimeChangedResources, context, config);
     this.feedMonitorThread.start();
+
 
   }
 
@@ -191,6 +193,7 @@ public class CouchdbSourceConnector extends SourceConnector {
   }
 
   private List<String> getAllDatabases() {
+    // TODO: Implement getAllDatabases
     return null;
   }
 

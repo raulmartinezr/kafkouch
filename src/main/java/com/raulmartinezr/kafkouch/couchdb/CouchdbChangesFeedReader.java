@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.raulmartinezr.kafkouch.connectors.RuntimeChangedResources;
 import com.raulmartinezr.kafkouch.couchdb.CouchdbClient.CouchdbAuthMethod;
 import com.raulmartinezr.kafkouch.couchdb.CouchdbClient.CouchdbClientBuilder;
 import com.raulmartinezr.kafkouch.couchdb.feed.ContinuousFeedEntry;
@@ -42,14 +43,13 @@ public class CouchdbChangesFeedReader {
   private long timeout;
   // private int sleepTime = 1000;
   // private boolean stopReading;
-  private BlockingQueue<ContinuousFeedEntry> changesQueue;
-  private ThreadSafeSetHandler<String> changedDatabases;
   private ContinuousFeedEntryConverter converter;
   private OrderedBuffer buffer;
   private long maxBufferTimeInterval;
   private int maxBufferSize;
 
   private CountDownLatch shutdownLatch;
+  private RuntimeChangedResources RuntimeChangedResources;
 
   /**
    * Instantiates a new CouchdbClient.
@@ -66,8 +66,7 @@ public class CouchdbChangesFeedReader {
     this.feed = builder.getFeed();
     this.heartbeat = builder.getHeartbeat();
     this.timeout = builder.getTimeout();
-    this.changesQueue = builder.getChangesQueue();
-    this.changedDatabases = builder.getChangedDatabases();
+    this.RuntimeChangedResources = builder.getRuntimeChangedResources();
     this.converter = new ContinuousFeedEntryConverter();
     this.buffer = null;
     this.maxBufferTimeInterval = builder.getMaxBufferTimeInterval();
@@ -75,6 +74,13 @@ public class CouchdbChangesFeedReader {
 
     this.shutdownLatch = new CountDownLatch(1);
 
+  }
+
+  /**
+   * @return the client
+   */
+  public CouchdbClient getClient() {
+    return client;
   }
 
   public void startReadingChangesFeed() {
@@ -93,8 +99,15 @@ public class CouchdbChangesFeedReader {
         new Request.Builder().url(globalChangesFeedUrl).headers(headerBuilder.build()).build();
 
     this.buffer = new OrderedBuffer(this.maxBufferSize, this.maxBufferTimeInterval,
-        this.changesQueue, this.changedDatabases); // Buffer up to 10 elements or flush
-                                                   // every 5
+        this.RuntimeChangedResources); // Buffer
+    // up
+    // to
+    // 10
+    // elements
+    // or
+    // flush
+    // every
+    // 5
 
     try (Response response = this.client.getHttpClient().newCall(request).execute()) {
       if (response.isSuccessful()) {
@@ -217,8 +230,6 @@ public class CouchdbChangesFeedReader {
 
   public static class CouchdbChangesFeedReaderBuilder {
 
-    private BlockingQueue<ContinuousFeedEntry> changesQueue;
-    private ThreadSafeSetHandler<String> changedDatabases;
     private long heartbeat = 60000;
     private long timeout = 60000;
     private long readTimeout = 60000;
@@ -231,6 +242,7 @@ public class CouchdbChangesFeedReader {
     private CouchdbAuthMethod authMethod;
     private int maxBufferSize = 100;
     private long maxBufferTimeInterval = 500; // ms
+    private RuntimeChangedResources RuntimeChangedResources;
 
     public CouchdbChangesFeedReaderBuilder() {}
 
@@ -238,11 +250,9 @@ public class CouchdbChangesFeedReader {
       /**
        * Validates all required inputs are defined and not empty.
        */
-      assert this.changesQueue != null && (this.changesQueue instanceof BlockingQueue)
-          : "changesQueue must be an instance of BlockingQueue";
-      assert this.changedDatabases != null
-          && (this.changedDatabases instanceof ThreadSafeSetHandler)
-          : "changedDatabases must be an instance of ThreadSafeSetHandler";
+      assert this.RuntimeChangedResources != null
+          && (this.RuntimeChangedResources instanceof RuntimeChangedResources)
+          : "RuntimeChangedResources must be an instance of RuntimeChangedResources";
       assert this.url != null && this.url.isEmpty() : "url must not be empty";
       assert this.username != null && this.username.isEmpty() : "username must not be empty";
       assert this.password != null && this.password.isEmpty() : "password must not be empty";
@@ -303,15 +313,6 @@ public class CouchdbChangesFeedReader {
     }
 
     /**
-     * @param changesQueue the changesQueue to set
-     */
-    public CouchdbChangesFeedReaderBuilder setChangesQueue(
-        BlockingQueue<ContinuousFeedEntry> changesQueue) {
-      this.changesQueue = changesQueue;
-      return this;
-    }
-
-    /**
      * @param heartbeat the heartbeat to set
      */
     public CouchdbChangesFeedReaderBuilder setHeartbeat(long heartbeat) {
@@ -367,9 +368,9 @@ public class CouchdbChangesFeedReader {
       return this;
     }
 
-    public CouchdbChangesFeedReaderBuilder setChangedDatabases(
-        ThreadSafeSetHandler<String> changedDatabases) {
-      this.changedDatabases = changedDatabases;
+    public CouchdbChangesFeedReaderBuilder setRuntimeChangedResources(
+        RuntimeChangedResources RuntimeChangedResources) {
+      this.RuntimeChangedResources = RuntimeChangedResources;
       return this;
     }
 
@@ -409,10 +410,10 @@ public class CouchdbChangesFeedReader {
     }
 
     /**
-     * @return the changesQueue
+     * @return the RuntimeChangedResources
      */
-    public BlockingQueue<ContinuousFeedEntry> getChangesQueue() {
-      return changesQueue;
+    public RuntimeChangedResources getRuntimeChangedResources() {
+      return RuntimeChangedResources;
     }
 
     /**
@@ -464,13 +465,6 @@ public class CouchdbChangesFeedReader {
       return readTimeout;
     }
 
-    /**
-     * @return the changedDatabases
-     */
-    public ThreadSafeSetHandler<String> getChangedDatabases() {
-      return changedDatabases;
-    }
-
   }
 
   public class OrderedBuffer {
@@ -481,17 +475,15 @@ public class CouchdbChangesFeedReader {
     private int maxBufferSize;
     private long maxTimeInterval;
     private Timer flushTimer;
-    private BlockingQueue<ContinuousFeedEntry> queue;
-    private ThreadSafeSetHandler<String> classifier;
+    private RuntimeChangedResources RuntimeChangedResources;
 
     public OrderedBuffer(int maxBufferSize, long maxTimeInterval,
-        BlockingQueue<ContinuousFeedEntry> queue, ThreadSafeSetHandler<String> classifier) {
+        RuntimeChangedResources RuntimeChangedResources) {
       this.buffer = new LinkedBlockingDeque<>();
       this.maxBufferSize = maxBufferSize;
       this.maxTimeInterval = maxTimeInterval;
       this.flushTimer = new Timer();
-      this.queue = queue;
-      this.classifier = classifier;
+      this.RuntimeChangedResources = RuntimeChangedResources;
 
     }
 
@@ -528,8 +520,7 @@ public class CouchdbChangesFeedReader {
         try {
           ContinuousFeedEntry data = buffer.pollFirst(maxTimeInterval, TimeUnit.MILLISECONDS);
           if (data != null) {
-            this.queue.put(data);
-            this.classifier.add(data.getDbName());
+            this.RuntimeChangedResources.registerChange(data);
           }
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();

@@ -37,4 +37,8 @@ public class ThreadSafeSetHandler<T> {
   public synchronized void setSet(Set<T> set) {
     this.set = set;
   }
+
+  public synchronized void clear() {
+    this.set = new HashSet<T>();
+  }
 }

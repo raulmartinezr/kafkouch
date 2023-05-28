@@ -49,6 +49,7 @@
 		<slf4j.version>2.0.7</slf4j.version>
 		<jmeshpath.version>0.5.1</jmeshpath.version>
 		<jackson.version>2.15.1</jackson.version>
+		<ektorp.version>1.5.0</ektorp.version>
 	</properties>
 
 
@@ -107,6 +108,12 @@
 			<artifactId>jackson-databind</artifactId>
 			<version>${jackson.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>org.ektorp</groupId>
+			<artifactId>org.ektorp</artifactId>
+			<version>${ektorp.version}</version>
+		</dependency>
+
 
 
 

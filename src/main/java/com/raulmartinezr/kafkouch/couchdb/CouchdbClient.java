@@ -18,7 +18,9 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
-public class CouchdbClient {
+import com.raulmartinezr.kafkouch.couchdb.client.AllDatabases;
+
+public class CouchdbClient extends AllDatabases {
 
   private static final Logger log = LoggerFactory.getLogger(CouchdbClient.class);
 
