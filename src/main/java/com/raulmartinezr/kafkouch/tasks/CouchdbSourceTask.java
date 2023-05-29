@@ -11,25 +11,27 @@ public class CouchdbSourceTask extends SourceTask {
   @Override
   public String version() {
     // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'version'");
+    // throw new UnsupportedOperationException("Unimplemented method 'version'");
+    return null;
   }
 
   @Override
   public List<SourceRecord> poll() throws InterruptedException {
     // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'poll'");
+    // throw new UnsupportedOperationException("Unimplemented method 'poll'");
+    return null;
   }
 
   @Override
   public void start(Map<String, String> arg0) {
     // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'start'");
+    // throw new UnsupportedOperationException("Unimplemented method 'start'");
   }
 
   @Override
   public void stop() {
     // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'stop'");
+    // throw new UnsupportedOperationException("Unimplemented method 'stop'");
   }
 
 }

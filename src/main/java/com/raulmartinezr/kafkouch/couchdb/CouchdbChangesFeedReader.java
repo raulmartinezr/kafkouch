@@ -19,7 +19,9 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.raulmartinezr.kafkouch.connectors.RuntimeChangedResources;
 import com.raulmartinezr.kafkouch.couchdb.CouchdbClient.CouchdbAuthMethod;
-import com.raulmartinezr.kafkouch.couchdb.CouchdbClient.CouchdbClientBuilder;
+import com.raulmartinezr.kafkouch.couchdb.CouchdbClient.FeedType;
+import com.raulmartinezr.kafkouch.couchdb.client.IDBUpdatesHandler;
+
 import com.raulmartinezr.kafkouch.couchdb.feed.ContinuousFeedEntry;
 import com.raulmartinezr.kafkouch.couchdb.feed.ContinuousFeedEntryConverter;
 import com.raulmartinezr.kafkouch.util.ThreadSafeSetHandler;
@@ -27,6 +29,7 @@ import com.raulmartinezr.kafkouch.util.ThreadSafeSetHandler;
 import okhttp3.Cookie;
 import okhttp3.Headers;
 import okhttp3.HttpUrl;
+import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
@@ -57,12 +60,7 @@ public class CouchdbChangesFeedReader {
 
   public CouchdbChangesFeedReader(CouchdbChangesFeedReaderBuilder builder) {
 
-    this.client =
-        new CouchdbClientBuilder().setUrl(builder.getUrl()).setUsername(builder.getUsername())
-            .setPassword(builder.getPassword()).setAuthMethod(builder.getAuthMethod())
-            .setConnect(builder.isConnect()).setReadTimeout(builder.getReadTimeout()).build();
-
-    this.since = builder.getSince();
+    this.client = builder.getCouchdbClient();
     this.feed = builder.getFeed();
     this.heartbeat = builder.getHeartbeat();
     this.timeout = builder.getTimeout();
@@ -83,37 +81,36 @@ public class CouchdbChangesFeedReader {
     return client;
   }
 
-  public void startReadingChangesFeed() {
-    String globalChangesFeedUrl = this.client.getUrl() + "/_db_updates?feed=" + this.feed.value
-        + "&heartbeat=" + this.heartbeat + "&timeout=" + this.timeout + "&since=" + this.since;
-
-    List<Cookie> cookies =
-        this.client.getCookieJar().loadForRequest(HttpUrl.parse(this.client.getUrl()));
-    Headers.Builder headerBuilder = new Headers.Builder();
-
-    for (Cookie cookie : cookies) {
-      headerBuilder.add("Cookie", cookie.name() + "=" + cookie.value());
-    }
-
-    Request request =
-        new Request.Builder().url(globalChangesFeedUrl).headers(headerBuilder.build()).build();
+  public void startReadingChangesFeed(String since) {
 
     this.buffer = new OrderedBuffer(this.maxBufferSize, this.maxBufferTimeInterval,
         this.RuntimeChangedResources); // Buffer
-    // up
-    // to
-    // 10
-    // elements
-    // or
-    // flush
-    // every
-    // 5
 
-    try (Response response = this.client.getHttpClient().newCall(request).execute()) {
-      if (response.isSuccessful()) {
-        this.buffer.start();
-        InputStream inputStream = response.body().byteStream();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+    IDBUpdatesHandler updatesHandler = new IDBUpdatesHandler() {
+
+      @Override
+      public void onResponseSuccessfull(Request request, Response response) {
+        buffer.start();
+      }
+
+      @Override
+      public void onResponseError(Request request, Response response) {
+        printFeedRequest(request);
+      }
+
+      @Override
+      public void onClose(Request request, Response response, OkHttpClient client) {
+        buffer.stop();
+        client.dispatcher().executorService().shutdown();
+      }
+
+      @Override
+      public void onException(Request request) {
+        printFeedRequest(request);
+      }
+
+      @Override
+      public void onRead(BufferedReader reader) throws IOException {
         String line;
         while ((line = reader.readLine()) != null && shutdownLatch.getCount() > 0) {
           // Process each line of the response
@@ -128,58 +125,10 @@ public class CouchdbChangesFeedReader {
 
           }
         }
-
-        // Remember to close the input stream and reader when you're done
-        reader.close();
-        inputStream.close();
-        this.buffer.stop();
-      } else {
-        log.error("Error: " + response.code() + " " + response.message());
-        printFeedRequest(request);
       }
-    } catch (IOException e) {
-      log.error("Request failed: " + e.getMessage(), e);
-      printFeedRequest(request);
-    }
+    };
 
-    // WebSocketListener listener = new WebSocketListener() {
-    // @Override
-    // public void onOpen(WebSocket webSocket, Response response) {
-    // System.out.println("Connected to CouchDB changes feed.");
-    // buffer.start();
-    // }
-
-    // @Override
-    // public void onMessage(WebSocket webSocket, String text) {
-    // System.out.println("Received change: " + text);
-    // ContinuousFeedEntry feedEntry = converter.convertToJavaObject(text);
-    // buffer.add(feedEntry);
-    // }
-
-    // @Override
-    // public void onClosing(WebSocket webSocket, int code, String reason) {
-    // System.out.println("Closing connection to CouchDB changes feed.");
-    // buffer.stop();
-    // }
-
-    // @Override
-    // public void onFailure(WebSocket webSocket, Throwable t, Response response) {
-    // System.err.println("Error: " + t.getMessage());
-    // printFeedRequest(request);
-    // }
-    // };
-    // WebSocket webSocket = this.client.getHttpClient().newWebSocket(request,
-    // listener);
-    // while (!this.stopReading) {
-    // try {
-    // Thread.sleep(this.sleepTime);
-    // } catch (InterruptedException e) {
-    // break;
-    // }
-
-    // }
-    // webSocket.close(1000, "Closing WebSocket");
-    this.client.getHttpClient().dispatcher().executorService().shutdown();
+    this.client.serverDBUpdatesGet(this.feed, since, this.heartbeat, this.timeout, updatesHandler);
 
   }
 
@@ -213,36 +162,21 @@ public class CouchdbChangesFeedReader {
     shutdownLatch.countDown();
   }
 
-  public enum FeedType {
-    NORMAL("normal"), LONGPOOLL("longpoll"), CONTINUOUS("continuous"), EVENTSOURCE("eventsource");
-
-    private final String value;
-
-    FeedType(String value) {
-      this.value = value;
-    }
-
-    @JsonValue
-    public String getValue() {
-      return value;
-    }
-  }
-
   public static class CouchdbChangesFeedReaderBuilder {
 
     private long heartbeat = 60000;
     private long timeout = 60000;
-    private long readTimeout = 60000;
+    // private long readTimeout = 60000;
     private FeedType feed = FeedType.CONTINUOUS;
-    private String since = "now";
-    private boolean connect = true;
-    private String url;
-    private String username;
-    private String password;
-    private CouchdbAuthMethod authMethod;
+    // private boolean connect = true;
+    // private String url;
+    // private String username;
+    // private String password;
+    // private CouchdbAuthMethod authMethod;
     private int maxBufferSize = 100;
     private long maxBufferTimeInterval = 500; // ms
     private RuntimeChangedResources RuntimeChangedResources;
+    private CouchdbClient couchdbClient;
 
     public CouchdbChangesFeedReaderBuilder() {}
 
@@ -253,11 +187,14 @@ public class CouchdbChangesFeedReader {
       assert this.RuntimeChangedResources != null
           && (this.RuntimeChangedResources instanceof RuntimeChangedResources)
           : "RuntimeChangedResources must be an instance of RuntimeChangedResources";
-      assert this.url != null && this.url.isEmpty() : "url must not be empty";
-      assert this.username != null && this.username.isEmpty() : "username must not be empty";
-      assert this.password != null && this.password.isEmpty() : "password must not be empty";
-      assert this.authMethod != null && (this.authMethod instanceof CouchdbAuthMethod)
-          : "authMethod must be an instance of CouchdbAuthMethod";
+      // assert this.url != null && this.url.isEmpty() : "url must not be empty";
+      // assert this.username != null && this.username.isEmpty() : "username must not
+      // be empty";
+      // assert this.password != null && this.password.isEmpty() : "password must not
+      // be empty";
+      // assert this.authMethod != null && (this.authMethod instanceof
+      // CouchdbAuthMethod)
+      // : "authMethod must be an instance of CouchdbAuthMethod";
       assert this.feed != null && (this.feed instanceof FeedType)
           : "feed must be an instance of FeedType";
     }
@@ -271,46 +208,47 @@ public class CouchdbChangesFeedReader {
       return feedReader;
     }
 
-    /**
-     * @param connect the connect to set
-     */
-    public CouchdbChangesFeedReaderBuilder setConnect(boolean connect) {
-      this.connect = connect;
-      return this;
-    }
+    // /**
+    // * @param connect the connect to set
+    // */
+    // public CouchdbChangesFeedReaderBuilder setConnect(boolean connect) {
+    // this.connect = connect;
+    // return this;
+    // }
 
-    /**
-     * @param url the url to set
-     */
-    public CouchdbChangesFeedReaderBuilder setUrl(String url) {
-      this.url = url;
-      return this;
-    }
+    // /**
+    // * @param url the url to set
+    // */
+    // public CouchdbChangesFeedReaderBuilder setUrl(String url) {
+    // this.url = url;
+    // return this;
+    // }
 
-    /**
-     * @param username the username to set
-     * @return
-     */
-    public CouchdbChangesFeedReaderBuilder setUsername(String username) {
-      this.username = username;
-      return this;
-    }
+    // /**
+    // * @param username the username to set
+    // * @return
+    // */
+    // public CouchdbChangesFeedReaderBuilder setUsername(String username) {
+    // this.username = username;
+    // return this;
+    // }
 
-    /**
-     * @param password the password to set
-     */
-    public CouchdbChangesFeedReaderBuilder setPassword(String password) {
-      this.password = password;
-      return this;
-    }
+    // /**
+    // * @param password the password to set
+    // */
+    // public CouchdbChangesFeedReaderBuilder setPassword(String password) {
+    // this.password = password;
+    // return this;
+    // }
 
-    /**
-     * @param authMethod the authMethod to set
-     */
-    public CouchdbChangesFeedReaderBuilder setAuthMethod(CouchdbAuthMethod authMethod) {
-      this.authMethod = authMethod;
-      return this;
-    }
+    // /**
+    // * @param authMethod the authMethod to set
+    // */
+    // public CouchdbChangesFeedReaderBuilder setAuthMethod(CouchdbAuthMethod
+    // authMethod) {
+    // this.authMethod = authMethod;
+    // return this;
+    // }
 
     /**
      * @param heartbeat the heartbeat to set
@@ -325,14 +263,6 @@ public class CouchdbChangesFeedReader {
      */
     public CouchdbChangesFeedReaderBuilder setTimeout(long timeout) {
       this.timeout = timeout;
-      return this;
-    }
-
-    /**
-     * @param since the since to set
-     */
-    public CouchdbChangesFeedReaderBuilder setSince(String since) {
-      this.since = since;
       return this;
     }
 
@@ -360,13 +290,13 @@ public class CouchdbChangesFeedReader {
       return this;
     }
 
-    /**
-     * @param readTimeout the readTimeout to set
-     */
-    public CouchdbChangesFeedReaderBuilder setReadTimeout(long readTimeout) {
-      this.readTimeout = readTimeout;
-      return this;
-    }
+    // /**
+    // * @param readTimeout the readTimeout to set
+    // */
+    // public CouchdbChangesFeedReaderBuilder setReadTimeout(long readTimeout) {
+    // this.readTimeout = readTimeout;
+    // return this;
+    // }
 
     public CouchdbChangesFeedReaderBuilder setRuntimeChangedResources(
         RuntimeChangedResources RuntimeChangedResources) {
@@ -374,40 +304,40 @@ public class CouchdbChangesFeedReader {
       return this;
     }
 
-    /**
-     * @return the connect
-     */
-    public boolean isConnect() {
-      return connect;
-    }
+    // /**
+    // * @return the connect
+    // */
+    // public boolean isConnect() {
+    // return connect;
+    // }
 
-    /**
-     * @return the url
-     */
-    public String getUrl() {
-      return url;
-    }
+    // /**
+    // * @return the url
+    // */
+    // public String getUrl() {
+    // return url;
+    // }
 
-    /**
-     * @return the username
-     */
-    public String getUsername() {
-      return username;
-    }
+    // /**
+    // * @return the username
+    // */
+    // public String getUsername() {
+    // return username;
+    // }
 
-    /**
-     * @return the password
-     */
-    public String getPassword() {
-      return password;
-    }
+    // /**
+    // * @return the password
+    // */
+    // public String getPassword() {
+    // return password;
+    // }
 
-    /**
-     * @return the authMethod
-     */
-    public CouchdbAuthMethod getAuthMethod() {
-      return authMethod;
-    }
+    // /**
+    // * @return the authMethod
+    // */
+    // public CouchdbAuthMethod getAuthMethod() {
+    // return authMethod;
+    // }
 
     /**
      * @return the RuntimeChangedResources
@@ -428,13 +358,6 @@ public class CouchdbChangesFeedReader {
      */
     public long getTimeout() {
       return timeout;
-    }
-
-    /**
-     * @return the since
-     */
-    public String getSince() {
-      return since;
     }
 
     /**
@@ -459,11 +382,26 @@ public class CouchdbChangesFeedReader {
     }
 
     /**
-     * @return the readTimeout
+     * @return the couchdbClient
      */
-    public long getReadTimeout() {
-      return readTimeout;
+    public CouchdbClient getCouchdbClient() {
+      return couchdbClient;
     }
+
+    /**
+     * @param couchdbClient the couchdbClient to set
+     */
+    public CouchdbChangesFeedReaderBuilder setCouchdbClient(CouchdbClient couchdbClient) {
+      this.couchdbClient = couchdbClient;
+      return this;
+    }
+
+    // /**
+    // * @return the readTimeout
+    // */
+    // public long getReadTimeout() {
+    // return readTimeout;
+    // }
 
   }
 

@@ -16,9 +16,14 @@ import org.slf4j.MDC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.raulmartinezr.kafkouch.connectors.config.ConfigHelper;
 import com.raulmartinezr.kafkouch.connectors.config.source.CouchdbSourceConfig;
 import com.raulmartinezr.kafkouch.connectors.config.source.CouchdbSourceTaskConfig;
+import com.raulmartinezr.kafkouch.couchdb.CouchdbClient;
+import com.raulmartinezr.kafkouch.couchdb.CouchdbClientBuilder;
+import com.raulmartinezr.kafkouch.couchdb.client.pojo.Document;
 import com.raulmartinezr.kafkouch.tasks.CouchdbSourceTask;
 import com.raulmartinezr.kafkouch.util.CollectionFilterMap;
 import com.raulmartinezr.kafkouch.util.CollectionFilterType;
@@ -36,13 +41,16 @@ public class CouchdbSourceConnector extends SourceConnector {
 
   private static final Logger log = LoggerFactory.getLogger(CouchdbSourceConnector.class);
   private CouchdbSourceConfig config;
+  private CollectionsConfiguration collectionsConfiguration;
 
-  RuntimeChangedResources RuntimeChangedResources = null;
+  RuntimeChangedResources runtimeChangedResources = null;
 
   FeedMonitorThread feedMonitorThread = null;
   private Map<String, String> configProperties;
 
   private final ConnectorLifecycle lifecycle = new ConnectorLifecycle();
+  private CouchdbClient couchdbClient;
+  private List<EnabledCollectionsSet> expandedDatabaseToCollections;
 
   @Override
   public String version() {
@@ -63,17 +71,73 @@ public class CouchdbSourceConnector extends SourceConnector {
     this.config = ConfigHelper.parse(CouchdbSourceConfig.class, this.configProperties);
     this.setLogLevel(config.logLevel().toString());
 
-    RuntimeChangedResources = new RuntimeChangedResources();
+    this.couchdbClient =
+        new CouchdbClientBuilder().setUrl(this.config.url()).setUsername(this.config.username())
+            .setPassword(this.config.password().value()).setAuthMethod(this.config.authMethod())
+            .setConnect(true).setReadTimeout(this.config.httpTimeout().toMillis()).build();
+
+    this.collectionsConfiguration = new CollectionsConfiguration(
+        DatabaseCollectionsMap.parseDatabaseToCollections(config.collectionsInDatabases()),
+        CollectionTopicMap.parseCollectionToTopic(config.collectionToTopic()),
+        CollectionFilterMap.parseCollectionToFilter(config.collections()));
+    // Expand first time. If "__all__" not in databases, the same value will be used
+    // always
+    this.expandedDatabaseToCollections =
+        this.expandDatabaseToCollections(this.collectionsConfiguration.getDatabaseToCollections(),
+            this.collectionsConfiguration.getCollectionToFilter());
+    this.runtimeChangedResources = new RuntimeChangedResources();
     /*
      * Probably we would only need changed databases. The offset obtained in task will contain last
      * seq read from database Using that as starting point would be enough. From changes queue maybe
      * we could get the last seq read from database and use it as starting point in next glonal
      * changes request
      */
-    this.feedMonitorThread = new FeedMonitorThread(this.RuntimeChangedResources, context, config);
+
+    String since = this.getSinceOffset();
+    this.feedMonitorThread = new FeedMonitorThread(this.runtimeChangedResources, context, config,
+        since, this.couchdbClient);
     this.feedMonitorThread.start();
 
+  }
 
+  private String getSinceOffset() {
+    boolean databaseCreated = this.ensurePersistanceDatabase();
+    boolean documentCreated = this.ensurePersistanceDocument();
+    if (databaseCreated || documentCreated) {
+      return this.config.persistanceDatabase(); // When there was nothing, use configured value
+    } else {
+      String dbSince = this.getSinceFromDatabase();
+      return dbSince != null ? dbSince : this.config.since();
+    }
+  }
+
+  private String getSinceFromDatabase() {
+    Document connectorStorage = this.couchdbClient.documentGet(this.config.persistanceDatabase(),
+        this.config.connectorName());
+    return connectorStorage.getProperties() != null
+        ? (String) connectorStorage.getProperties().get("since")
+        : null;
+  }
+
+  private boolean ensurePersistanceDocument() {
+    String databaseName = this.config.persistanceDatabase();
+    String documentId = this.config.connectorName();
+    boolean exists = this.couchdbClient.documentHead(databaseName, documentId);
+    if (!exists) {
+      ObjectMapper objectMapper = new ObjectMapper();
+      JsonNode emptyJson = objectMapper.createObjectNode();
+      this.couchdbClient.documentPut(databaseName, documentId, emptyJson.toString());
+    }
+    return !exists;
+  }
+
+  private boolean ensurePersistanceDatabase() {
+    String databaseName = this.config.persistanceDatabase();
+    boolean exists = this.couchdbClient.databaseHead(databaseName);
+    if (!exists) {
+      this.couchdbClient.databasePut(databaseName);
+    }
+    return !exists;
   }
 
   @Override
@@ -99,20 +163,37 @@ public class CouchdbSourceConnector extends SourceConnector {
   @Override
   public List<Map<String, String>> taskConfigs(int maxTasks) {
 
-    Map<String, EnabledCollectionsType> databaseToCollections =
-        DatabaseCollectionsMap.parseDatabaseToCollections(config.collectionsInDatabases());
-    Map<String, String> collectionToTopic =
-        CollectionTopicMap.parseCollectionToTopic(config.collectionToTopic());
-    Map<String, CollectionFilterType> collectionToFilter =
-        CollectionFilterMap.parseCollectionToFilter(config.collections());
-    lifecycle.logCollectionsUnAssigned(collectionToFilter, collectionToTopic,
-        databaseToCollections);
+    /*
+     * Config would be always the same except if we have "__all__" keyword. In this case, if a
+     * database is created while connector is runnung, then it should be included
+     *
+     */
+    if (this.collectionsConfiguration.getDatabaseToCollections().containsKey("__all__")) {
+      this.expandedDatabaseToCollections =
+          this.expandDatabaseToCollections(this.collectionsConfiguration.getDatabaseToCollections(),
+              this.collectionsConfiguration.getCollectionToFilter());
+    }
 
-    List<EnabledCollectionsSet> expandedDatabaseToCollections =
-        this.expandDatabaseToCollections(databaseToCollections, collectionToFilter);
+    // Here the filter to use only changed databases. Using
+    // this.runtimeChangedResources
+    // Get current values and reset so it can be still used by feed thread.
+
+    Set<String> databasesChangedSinceLastCheck;
+    synchronized (this.runtimeChangedResources) {
+      ChangedResources currentChanges = this.runtimeChangedResources.getAndResetChanges();
+      databasesChangedSinceLastCheck = currentChanges.getChangedDatabases();
+      this.persistLastSeq(currentChanges.getLastSeq());
+    }
+
+    List<EnabledCollectionsSet> expandedListCopy =
+        new ArrayList<EnabledCollectionsSet>(this.expandedDatabaseToCollections);
+
+    List<EnabledCollectionsSet> filteredExpandedListCopy =
+        expandedListCopy.stream().filter(enabledCollectionSet -> databasesChangedSinceLastCheck
+            .contains(enabledCollectionSet.getDatabase())).collect(Collectors.toList());;
 
     List<List<EnabledCollectionsSet>> groupedDatabaseCollections =
-        groupPartitions(expandedDatabaseToCollections, maxTasks);
+        groupPartitions(filteredExpandedListCopy, maxTasks);
 
     lifecycle.logCollectionsAssigned(groupedDatabaseCollections);
 
@@ -136,6 +217,8 @@ public class CouchdbSourceConnector extends SourceConnector {
     return taskConfigs;
   }
 
+  private void persistLastSeq(String lastSeq) {}
+
   /**
    * Expands the database to collections map to include all databases if keyword "__all__" is was
    * included and all collections if keyword "*" was included for some database
@@ -153,7 +236,7 @@ public class CouchdbSourceConnector extends SourceConnector {
 
     Set<String> allCollections = collectionToFilter.keySet();
     if (expandDatabases) {
-      List<String> allDatabases = this.getAllDatabases();
+      Set<String> allDatabases = this.getAllDatabases();
       EnabledCollectionsType enabledCollectionsForAllDatabases =
           databaseToCollections.get("__all__");
       if (enabledCollectionsForAllDatabases.getEnabledCollections().contains("*")) {
@@ -165,6 +248,7 @@ public class CouchdbSourceConnector extends SourceConnector {
       }
     }
     // Fill with configured values
+    // Expand collections if needed
     for (String database : databaseToCollections.keySet()) {
       if (!database.equals("__all__")) {
         if (expandDatabases) {
@@ -192,9 +276,22 @@ public class CouchdbSourceConnector extends SourceConnector {
     return enabledCollections;
   }
 
-  private List<String> getAllDatabases() {
-    // TODO: Implement getAllDatabases
-    return null;
+  private Set<String> getAllDatabases() {
+    List<String> systemPrefixes = List.of("_", "internal__");
+    Set<String> allDatabases = this.couchdbClient.serverAllDatabasesGet();
+    return allDatabases.stream().filter(str -> !startsWithAny(str, systemPrefixes))
+        .collect(Collectors.toSet());
+  }
+
+  private boolean startsWithAny(String text, List<String> wordList) {
+    boolean startsWithWord = false;
+    for (String word : wordList) {
+      if (text.startsWith(word)) {
+        startsWithWord = true;
+        break;
+      }
+    }
+    return startsWithWord;
   }
 
   private void setLogLevel(String logLevel) {

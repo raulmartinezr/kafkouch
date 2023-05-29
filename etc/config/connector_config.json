@@ -1,4 +1,5 @@
 {
+    "couchdb.connector.name": "couchdb_kafka_connector",
     "name": "test",
     "connector.class": "com.raulmartinezr.kafkouch.connectors.CouchdbSourceConnector",
     "couchdb.password": "admin",

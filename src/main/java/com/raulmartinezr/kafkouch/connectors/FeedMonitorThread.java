@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 
 import com.raulmartinezr.kafkouch.connectors.config.source.CouchdbSourceConfig;
 import com.raulmartinezr.kafkouch.couchdb.CouchdbChangesFeedReader;
+import com.raulmartinezr.kafkouch.couchdb.CouchdbClient;
 import com.raulmartinezr.kafkouch.couchdb.CouchdbChangesFeedReader.CouchdbChangesFeedReaderBuilder;
 
 class FeedMonitorThread extends Thread {
@@ -20,15 +21,20 @@ class FeedMonitorThread extends Thread {
   private ConnectorContext context;
   private CouchdbChangesFeedReader couchdbChangesFeedReader = null;
   private CouchdbSourceConfig sourceConfig;
+  private String since;
+  private CouchdbClient couchdbClient;
 
   /**
    *
    */
   public FeedMonitorThread(RuntimeChangedResources RuntimeChangedResources,
-      ConnectorContext context, CouchdbSourceConfig sourceConfig) {
+      ConnectorContext context, CouchdbSourceConfig sourceConfig, String since,
+      CouchdbClient couchdbClient) {
     this.RuntimeChangedResources = RuntimeChangedResources;
     this.context = context;
     this.sourceConfig = sourceConfig;
+    this.couchdbClient = couchdbClient;
+    this.since = since;
     this.shutdownLatch = new CountDownLatch(1);
   }
 
@@ -52,6 +58,8 @@ class FeedMonitorThread extends Thread {
   private boolean updateTasks() {
     // Object record = this.changesQueue.take(); // Wait for a record to be
     // available
+    // When we have changes in a database and no task is running it
+    // Special case: task handling several databses: Could be thant the task already finished this DB
     return false;
   }
 
@@ -62,17 +70,14 @@ class FeedMonitorThread extends Thread {
   }
 
   private void startReadingFeed() {
-    this.couchdbChangesFeedReader = new CouchdbChangesFeedReaderBuilder().setUrl(sourceConfig.url())
-        .setUsername(sourceConfig.username()).setPassword(sourceConfig.password().value())
-        .setAuthMethod(sourceConfig.authMethod()).setConnect(true).setSince(sourceConfig.since())
-        .setRuntimeChangedResources(RuntimeChangedResources)
+    this.couchdbChangesFeedReader = new CouchdbChangesFeedReaderBuilder()
+        .setCouchdbClient(this.couchdbClient).setRuntimeChangedResources(RuntimeChangedResources)
         .setHeartbeat(sourceConfig.feedHeartbeat().toMillis())
         .setTimeout(sourceConfig.feedTimeout().toMillis())
         .setMaxBufferSize(sourceConfig.feedReaderBufferSize())
-        .setMaxBufferTimeInterval(sourceConfig.feedReaderBufferTimerInterval().toMillis())
-        .setReadTimeout(sourceConfig.httpTimeout().toMillis()).build();
+        .setMaxBufferTimeInterval(sourceConfig.feedReaderBufferTimerInterval().toMillis()).build();
 
-    this.couchdbChangesFeedReader.startReadingChangesFeed();
+    this.couchdbChangesFeedReader.startReadingChangesFeed(this.since);
 
   }
 
@@ -82,7 +87,5 @@ class FeedMonitorThread extends Thread {
   public CouchdbChangesFeedReader getCouchdbChangesFeedReader() {
     return couchdbChangesFeedReader;
   }
-
-
 
 }

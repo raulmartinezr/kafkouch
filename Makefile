@@ -65,5 +65,10 @@ docker-dev-stop: ## stop the environment
 
 stop: docker-dev-down
 
+connector-reaload:
+	curl -X POST http://localhost:8083/connectors/test/reload
+
+connectors-list:
+	curl -X GET http://localhost:8083/connectors/
 
 

@@ -44,7 +44,6 @@ public class RuntimeChangedResources {
     } finally {
       lock.unlock();
     }
-
   }
 
   /**

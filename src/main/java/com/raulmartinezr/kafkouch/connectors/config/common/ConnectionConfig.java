@@ -46,7 +46,7 @@ public interface ConnectionConfig {
   CouchdbAuthMethod authMethod();
 
   /**
-   * On startup, the connector will wait this long for a couchdeb connection to be established. If a
+   * On startup, the connector will wait this long for a couchdb connection to be established. If a
    * connection is not established before the timeout expires, the connector will terminate.
    */
   @Default("30s")

@@ -43,13 +43,13 @@
 
 		<kafka.version>3.4.0</kafka.version>
 		<okhttp.version>4.10.0</okhttp.version>
-		<runtime.javadoc.version>0.13.0</runtime.javadoc.version>
 		<jsoup.version>1.16.1</jsoup.version>
 		<logback.version>1.4.7</logback.version>
 		<slf4j.version>2.0.7</slf4j.version>
 		<jmeshpath.version>0.5.1</jmeshpath.version>
 		<jackson.version>2.15.1</jackson.version>
 		<ektorp.version>1.5.0</ektorp.version>
+		<runtime.javadoc.version>0.15.0</runtime.javadoc.version>
 	</properties>
 
 
@@ -161,7 +161,24 @@
 	<build>
 		<finalName>${project.groupId}-${project.artifactId}-${project.version}</finalName>
 		<plugins>
-
+			<plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.10.1</version>
+                <inherited>true</inherited>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <annotationProcessorPaths>
+                        <!-- Save Javadoc for use in Kafka config definitions. -->
+                        <annotationProcessorPath>
+                            <groupId>com.github.therapi</groupId>
+                            <artifactId>therapi-runtime-javadoc-scribe</artifactId>
+                            <version>${runtime.javadoc.version}</version>
+                        </annotationProcessorPath>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
 			<!-- <plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-shade-plugin</artifactId>
